@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Garments Hero</string>
+    <string name="empty_string"></string>
+    <string name="null_string">null</string>
+    <string name="admob_app_id">ca-app-pub-3015642322344048~7749141018</string>
+    <string name="banner_ad_unit_id">ca-app-pub-3015642322344048/5139080914</string>
+    <string name="rewarded_ad_unit_id">ca-app-pub-3015642322344048/8886745239</string>
+    <string name="rewarded_interstitial_ad_unit_id">ca-app-pub-3015642322344048/9496062662</string>
+</resources>
