@@ -1,0 +1,6 @@
+{
+  "name": "Garments Hero",
+  "description": "An entertainment and pocket-money earning quiz app for garment workers in Bangladesh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
