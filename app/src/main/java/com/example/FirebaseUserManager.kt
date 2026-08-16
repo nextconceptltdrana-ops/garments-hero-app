@@ -20,8 +20,18 @@ object FirebaseUserManager {
     private const val KEY_AVATAR_URL = "user_avatar_url"
     private const val KEY_IS_LOGGED_IN = "is_logged_in"
 
-    private val firestore: FirebaseFirestore
-        get() = FirebaseFirestore.getInstance()
+    private val firestore: FirebaseFirestore by lazy {
+        val db = FirebaseFirestore.getInstance()
+        try {
+            val settings = com.google.firebase.firestore.FirebaseFirestoreSettings.Builder()
+                .setPersistenceEnabled(true)
+                .build()
+            db.firestoreSettings = settings
+        } catch (e: Throwable) {
+            // Already initialized or default applied
+        }
+        db
+    }
 
     fun normalizeMobile(input: String): String {
         // Convert Bengali digits to English digits if any
@@ -100,8 +110,8 @@ object FirebaseUserManager {
                     createdAt = System.currentTimeMillis(),
                     currentLevel = 1,
                     completedLevels = 0,
-                    rewardCoins = 100,
-                    earningsTaka = 10.0
+                    rewardCoins = 0,
+                    earningsTaka = 0.0
                 )
 
                 // Save user to Firebase Firestore
@@ -119,8 +129,8 @@ object FirebaseUserManager {
                                     if (!refQuery.isEmpty) {
                                         val refDoc = refQuery.documents[0]
                                         val refCount = refDoc.getLong("referralsCount") ?: 0L
-                                        val refEarnings = refDoc.getDouble("earningsTaka") ?: 10.0
-                                        val refCoins = refDoc.getLong("rewardCoins") ?: 100L
+                                        val refEarnings = refDoc.getDouble("earningsTaka") ?: 0.0
+                                        val refCoins = refDoc.getLong("rewardCoins") ?: 0L
 
                                         refDoc.reference.update(
                                             mapOf(
@@ -152,8 +162,8 @@ object FirebaseUserManager {
                 createdAt = System.currentTimeMillis(),
                 currentLevel = 1,
                 completedLevels = 0,
-                rewardCoins = 100,
-                earningsTaka = 10.0
+                rewardCoins = 0,
+                earningsTaka = 0.0
             )
             saveSession(context, newUser)
             onResult(true, "নিবন্ধন সম্পন্ন হয়েছে!", newUser)
@@ -184,8 +194,8 @@ object FirebaseUserManager {
                     createdAt = snapshot.getLong("createdAt") ?: System.currentTimeMillis(),
                     currentLevel = (snapshot.getLong("currentLevel") ?: 1L).toInt(),
                     completedLevels = (snapshot.getLong("completedLevels") ?: 0L).toInt(),
-                    rewardCoins = snapshot.getLong("rewardCoins") ?: 100L,
-                    earningsTaka = snapshot.getDouble("earningsTaka") ?: 10.0,
+                    rewardCoins = snapshot.getLong("rewardCoins") ?: 0L,
+                    earningsTaka = snapshot.getDouble("earningsTaka") ?: 0.0,
                     avatarUrl = snapshot.getString("avatarUrl") ?: ""
                 )
                 saveSession(context, user)
@@ -312,11 +322,13 @@ object FirebaseUserManager {
             .get()
             .addOnSuccessListener { querySnapshot ->
                 val list = querySnapshot.documents.map { doc ->
+                    val userMobile = doc.getString("userMobile") ?: doc.getString("mobile") ?: ""
+                    val userName = doc.getString("userName") ?: doc.getString("name") ?: doc.getString("fullName") ?: ""
                     WithdrawalRequest(
                         id = doc.id,
-                        userMobile = doc.getString("userMobile") ?: "",
-                        userName = doc.getString("userName") ?: "",
-                        paymentMethod = doc.getString("paymentMethod") ?: "",
+                        userMobile = userMobile,
+                        userName = if (userName.isNotBlank()) userName else (if (userMobile.isNotBlank()) "ইউজার ($userMobile)" else "ইউজার"),
+                        paymentMethod = doc.getString("paymentMethod") ?: "বিকাশ",
                         paymentNumber = doc.getString("paymentNumber") ?: "",
                         amountTaka = doc.getDouble("amountTaka") ?: 0.0,
                         requestedAt = doc.getLong("requestedAt") ?: System.currentTimeMillis(),
@@ -335,7 +347,31 @@ object FirebaseUserManager {
             .get()
             .addOnSuccessListener { querySnapshot ->
                 val list = querySnapshot.documents.mapNotNull { doc ->
-                    doc.toObject(User::class.java)
+                    val rawName = doc.getString("name") ?: doc.getString("userName") ?: doc.getString("fullName") ?: ""
+                    val mobile = doc.getString("mobile") ?: doc.getString("phone") ?: doc.getString("userMobile") ?: doc.id
+                    val referralCode = doc.getString("referralCode") ?: ""
+                    val referredBy = doc.getString("referredBy") ?: ""
+                    val createdAt = doc.getLong("createdAt") ?: System.currentTimeMillis()
+                    val currentLevel = (doc.getLong("currentLevel") ?: 1L).toInt()
+                    val completedLevels = (doc.getLong("completedLevels") ?: 0L).toInt()
+                    val rewardCoins = doc.getLong("rewardCoins") ?: 0L
+                    val earningsTaka = doc.getDouble("earningsTaka") ?: 0.0
+                    val referralsCount = (doc.getLong("referralsCount") ?: 0L).toInt()
+                    val avatarUrl = doc.getString("avatarUrl") ?: ""
+
+                    User(
+                        name = if (rawName.isNotBlank()) rawName else "ইউজার ($mobile)",
+                        mobile = mobile,
+                        referralCode = referralCode,
+                        referredBy = referredBy,
+                        createdAt = createdAt,
+                        currentLevel = currentLevel,
+                        completedLevels = completedLevels,
+                        rewardCoins = rewardCoins,
+                        earningsTaka = earningsTaka,
+                        referralsCount = referralsCount,
+                        avatarUrl = avatarUrl
+                    )
                 }
                 onResult(list.sortedByDescending { it.createdAt })
             }
@@ -459,8 +495,8 @@ object FirebaseUserManager {
         val createdAt = prefs.getLong(KEY_CREATED_AT, System.currentTimeMillis())
         val currentLevel = prefs.getInt(KEY_CURRENT_LEVEL, 1)
         val completedLevels = prefs.getInt(KEY_COMPLETED_LEVELS, 0)
-        val rewardCoins = prefs.getLong(KEY_REWARD_COINS, 100L)
-        val earningsTaka = prefs.getFloat(KEY_EARNINGS_TAKA, 10.0f).toDouble()
+        val rewardCoins = prefs.getLong(KEY_REWARD_COINS, 0L)
+        val earningsTaka = prefs.getFloat(KEY_EARNINGS_TAKA, 0.0f).toDouble()
         val referralsCount = prefs.getInt(KEY_REFERRALS_COUNT, 0)
         val avatarUrl = prefs.getString(KEY_AVATAR_URL, "") ?: ""
 

@@ -124,6 +124,9 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                     }
                 }
             )
+        },
+        bottomBar = {
+            AdMobBannerView()
         }
     ) { paddingValues ->
         Box(
@@ -511,7 +514,13 @@ fun UserIncomeDashboard(
     val showWithdrawDialog by viewModel.showWithdrawDialog.collectAsState()
     val showCaptchaDialog by viewModel.showCaptchaDialog.collectAsState()
     val showSpinBarDialog by viewModel.showSpinBarDialog.collectAsState()
+    val showAdOverlay by viewModel.showAdOverlay.collectAsState()
+    val currentAdTitle by viewModel.currentAdTitle.collectAsState()
+    val currentAdIndex by viewModel.currentAdIndex.collectAsState()
     val adStatusMessage by viewModel.adStatusMessage.collectAsState()
+    val isFlowBusy by viewModel.isFlowBusy.collectAsState()
+    val quizFlowState by viewModel.quizFlowState.collectAsState()
+    val levelCompletionData by viewModel.levelCompletionData.collectAsState()
 
     Column(
         modifier = Modifier
@@ -522,7 +531,7 @@ fun UserIncomeDashboard(
     ) {
         if (adStatusMessage != null) {
             Surface(
-                color = Color(0xFF1E88E5),
+                color = if (quizFlowState is AuthViewModel.QuizFlowState.Completed) Color(0xFF2E7D32) else Color(0xFF1E88E5),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -532,12 +541,22 @@ fun UserIncomeDashboard(
                     modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    if (isFlowBusy) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                    }
                     Text(
                         text = adStatusMessage!!,
                         color = Color.White,
@@ -551,7 +570,11 @@ fun UserIncomeDashboard(
         // TOP ROUNDED GOLDEN BORDER HEADER FRAME
         GoldenHeaderFrame(
             user = user,
-            onWithdrawClick = { viewModel.setWithdrawDialogVisible(true) }
+            onWithdrawClick = {
+                if (!isFlowBusy) {
+                    viewModel.setWithdrawDialogVisible(true)
+                }
+            }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -559,11 +582,14 @@ fun UserIncomeDashboard(
         // Gameplay Level Card
         LevelPlayCard(
             user = user,
+            isFlowBusy = isFlowBusy,
             onPlayLevel = {
-                if (activity != null) {
-                    viewModel.startEarningAdFlow(activity)
-                } else {
-                    viewModel.completeCurrentLevel(context)
+                if (!isFlowBusy) {
+                    if (activity != null) {
+                        viewModel.startQuizFlow(activity)
+                    } else {
+                        viewModel.completeCurrentLevel(context)
+                    }
                 }
             }
         )
@@ -574,7 +600,11 @@ fun UserIncomeDashboard(
         UserAccountDetailsCard(
             user = user,
             context = context,
-            onLogout = { viewModel.logout(context) }
+            onLogout = {
+                if (!isFlowBusy) {
+                    viewModel.logout(context)
+                }
+            }
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -612,6 +642,217 @@ fun UserIncomeDashboard(
             onDismiss = { viewModel.setWithdrawDialogVisible(false) }
         )
     }
+
+    if (showAdOverlay) {
+        FullScreenAdOverlay(
+            adTitle = currentAdTitle,
+            adIndex = currentAdIndex,
+            onAdClosed = {
+                viewModel.dismissAdOverlay()
+            }
+        )
+    }
+
+    if (levelCompletionData != null && activity != null) {
+        LevelCompletionNextDialog(
+            data = levelCompletionData!!,
+            onNextLevel = {
+                viewModel.startNextLevel(activity)
+            },
+            onCancel = {
+                viewModel.cancelNextLevel()
+            }
+        )
+    }
+}
+
+@Composable
+fun LevelCompletionNextDialog(
+    data: AuthViewModel.LevelCompletionData,
+    onNextLevel: () -> Unit,
+    onCancel: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color(0xFF1E1B2E),
+        title = null,
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header Celebration Icon
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFFFFD700), Color(0xFFFFA000))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "🎉",
+                        fontSize = 32.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "লেভেল #${data.completedLevel} সফলভাবে সম্পন্ন!",
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = "টার্গেট: ১,০০,০০০ লেভেল মিশন 🎯",
+                    fontSize = 12.sp,
+                    color = Color(0xFFFFD700),
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Stats breakdown card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF2B263F))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("💰 এই লেভেলে আয়:", color = Color.LightGray, fontSize = 13.sp)
+                            Text(
+                                text = "+ ৳${String.format(Locale.US, "%.2f", data.takaEarned)}",
+                                color = Color(0xFF4ADE80),
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 15.sp
+                            )
+                        }
+
+                        if (data.bonusTaka > 0) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🎁 স্পিন বোনাস:", color = Color(0xFFE0E7FF), fontSize = 12.sp)
+                                Text(
+                                    text = "+ ৳${String.format(Locale.US, "%.2f", data.bonusTaka)}",
+                                    color = Color(0xFFFFD700),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.15f), modifier = Modifier.padding(vertical = 4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("💼 আপনার মোট ব্যালেন্স:", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(
+                                text = "৳${String.format(Locale.US, "%.2f", data.totalBalance)}",
+                                color = Color(0xFFFFD700),
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "আপনি কি পরের লেভেল #${data.nextLevel} শুরু করবেন?",
+                    color = Color.White.copy(alpha = 0.95f),
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onNextLevel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF00C853)
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "নেক্সট লেভেল #${data.nextLevel} শুরু করুন ➔",
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp
+                    )
+                }
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onCancel,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFFEF4444)),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFFEF4444)
+                )
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = Color(0xFFEF4444),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "ক্যানসেল / বিরতি নিন (Cancel)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+        }
+    )
 }
 
 @Composable
@@ -896,6 +1137,7 @@ fun GoldenHeaderFrame(
 @Composable
 fun LevelPlayCard(
     user: User,
+    isFlowBusy: Boolean = false,
     onPlayLevel: () -> Unit
 ) {
     val goldGradient = Brush.horizontalGradient(
@@ -907,10 +1149,18 @@ fun LevelPlayCard(
         )
     )
 
+    val busyGradient = Brush.horizontalGradient(
+        colors = listOf(
+            Color(0xFF37474F),
+            Color(0xFF455A64),
+            Color(0xFF37474F)
+        )
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(2.5.dp, goldGradient, RoundedCornerShape(24.dp)),
+            .border(2.5.dp, if (isFlowBusy) busyGradient else goldGradient, RoundedCornerShape(24.dp)),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1C2A)),
         elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
@@ -925,14 +1175,14 @@ fun LevelPlayCard(
                     .fillMaxWidth()
                     .height(68.dp)
                     .clip(RoundedCornerShape(34.dp))
-                    .clickable { onPlayLevel() },
+                    .clickable(enabled = !isFlowBusy) { onPlayLevel() },
                 shape = RoundedCornerShape(34.dp),
                 color = Color.Unspecified
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(goldGradient)
+                        .background(if (isFlowBusy) busyGradient else goldGradient)
                         .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -944,29 +1194,37 @@ fun LevelPlayCard(
                             modifier = Modifier
                                 .size(44.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF3E2723)),
+                                .background(if (isFlowBusy) Color(0xFF263238) else Color(0xFF3E2723)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Start Earning",
-                                tint = Color(0xFFFFD700),
-                                modifier = Modifier.size(28.dp)
-                            )
+                            if (isFlowBusy) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = Color(0xFFFFD700),
+                                    strokeWidth = 2.5.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = "Start Earning",
+                                    tint = Color(0xFFFFD700),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
                         }
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(horizontalAlignment = Alignment.Start) {
                             Text(
-                                text = "START EARNING MONEY 💰",
+                                text = if (isFlowBusy) "বিজ্ঞাপন ও টাস্ক চলমান..." else "START EARNING MONEY 💰",
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Black,
-                                color = Color(0xFF211300)
+                                color = if (isFlowBusy) Color.White else Color(0xFF211300)
                             )
                             Text(
-                                text = "লেভেল #${user.currentLevel} শুরু করুন (আয়: ২০প + স্পিন বোনাস)",
+                                text = if (isFlowBusy) "অনুগ্রহ করে বিজ্ঞাপন বা টাস্ক সম্পন্ন করুন" else "লেভেল #${user.currentLevel} শুরু করুন (আয়: ২৫প + স্পিন বোনাস)",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF4E342E)
+                                color = if (isFlowBusy) Color.LightGray else Color(0xFF4E342E)
                             )
                         }
                     }
@@ -1671,6 +1929,13 @@ fun AdminWithdrawalItemCard(
         else -> "অপেক্ষমাণ (PENDING)"
     }
 
+    val dateFormatted = try {
+        val sdf = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+        sdf.format(java.util.Date(item.requestedAt))
+    } catch (e: Exception) {
+        "আজকের রিকোয়েস্ট"
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -1683,11 +1948,37 @@ fun AdminWithdrawalItemCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = item.userName.ifEmpty { "ইউজার" },
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF00695C)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = item.userName.take(1).uppercase().ifEmpty { "U" },
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = item.userName.ifEmpty { "ইউজার (${item.userMobile})" },
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "📅 $dateFormatted",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+
                 Surface(
                     color = statusColor.copy(alpha = 0.15f),
                     shape = RoundedCornerShape(8.dp)
@@ -1702,7 +1993,9 @@ fun AdminWithdrawalItemCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
                 text = "📱 পেমেন্ট নম্বর (${item.paymentMethod}): ${item.paymentNumber}",
@@ -1712,14 +2005,14 @@ fun AdminWithdrawalItemCard(
             )
             Text(
                 text = "💰 উইথড্র পরিমাণ: ৳${String.format(Locale.US, "%.2f", item.amountTaka)}",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
                 color = Color(0xFF2E7D32)
             )
             Text(
                 text = "👤 রেজিস্ট্রেশন মোবাইল: ${item.userMobile}",
                 fontSize = 12.sp,
-                color = Color.Gray
+                color = Color.DarkGray
             )
 
             if (item.status == "PENDING") {
@@ -1756,6 +2049,13 @@ fun AdminWithdrawalItemCard(
 
 @Composable
 fun AdminUserItemCard(user: User) {
+    val dateFormatted = try {
+        val sdf = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+        sdf.format(java.util.Date(user.createdAt))
+    } catch (e: Exception) {
+        "নতুন জয়েন"
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -1766,17 +2066,17 @@ fun AdminUserItemCard(user: User) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(46.dp)
                     .clip(CircleShape)
                     .background(Color(0xFF311B92)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = user.name.take(1).uppercase(),
+                    text = user.name.take(1).uppercase().ifEmpty { "U" },
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
@@ -1787,21 +2087,55 @@ fun AdminUserItemCard(user: User) {
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = user.name,
+                    text = user.name.ifEmpty { "ইউজার (${user.mobile})" },
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    fontSize = 16.sp,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "📱 ${user.mobile} | 🎁 রেফার: ${user.referralCode}",
-                    fontSize = 12.sp,
+                    text = "📱 মোবাইল: ${user.mobile}",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "📅 যোগদানের সময়: $dateFormatted",
+                    fontSize = 11.sp,
                     color = Color.Gray
                 )
                 Text(
-                    text = "⭐ লেভেল #${user.currentLevel} | 💰 ব্যালেন্স: ৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
+                    text = "🎁 নিজের কোড: ${user.referralCode} | 🤝 যার রেফারে: ${if (user.referredBy.isNotBlank()) user.referredBy else "সরাসরি"}",
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF2E7D32)
+                    color = Color(0xFFE65100)
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = Color(0xFF311B92).copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "⭐ লেভেল #${user.currentLevel}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF311B92),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Surface(
+                        color = Color(0xFF2E7D32).copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "💰 ব্যালেন্স: ৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2E7D32),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -1895,6 +2229,237 @@ fun AppBlockedScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("👑 এডমিন প্যানেল এক্সেস করুন", color = Color(0xFFFFD700), fontWeight = FontWeight.ExtraBold)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun FullScreenAdOverlay(
+    adTitle: String,
+    adIndex: Int,
+    onAdClosed: () -> Unit
+) {
+    val totalAdDuration = 10 // Full 10s strict viewing duration as requested
+    var timerSeconds by remember(adTitle, adIndex) { mutableStateOf(totalAdDuration) }
+    var canClose by remember(adTitle, adIndex) { mutableStateOf(false) }
+
+    // Intercept hardware system back button only when completed
+    androidx.activity.compose.BackHandler(enabled = canClose) {
+        onAdClosed()
+    }
+
+    LaunchedEffect(adTitle, adIndex) {
+        timerSeconds = totalAdDuration
+        canClose = false
+        for (i in totalAdDuration downTo 1) {
+            timerSeconds = i
+            kotlinx.coroutines.delay(1000L)
+        }
+        timerSeconds = 0
+        canClose = true
+    }
+
+    val progress = remember(timerSeconds) {
+        ((totalAdDuration - timerSeconds).toFloat() / totalAdDuration.toFloat()).coerceIn(0f, 1f)
+    }
+
+    // Direct Fullscreen Box overlay inside root Compose tree without Window Dialog layer
+    // This completely prevents emulator input capture freezing and guarantees 100% responsiveness.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0B1120))
+            .clickable(
+                indication = null,
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            ) { /* Consume clicks to prevent background pass-through */ }
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Top Header Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    color = Color(0xFFFFD700).copy(alpha = 0.2f),
+                    border = BorderStroke(1.dp, Color(0xFFFFD700)),
+                    shape = RoundedCornerShape(20.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OndemandVideo,
+                            contentDescription = null,
+                            tint = Color(0xFFFFD700),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Google AdMob • $adTitle",
+                            color = Color(0xFFFFD700),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Close / Countdown Indicator (Only allows close after full 10 seconds)
+                if (canClose) {
+                    Button(
+                        onClick = {
+                            onAdClosed()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close Ad",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("অ্যাড বন্ধ করুন ✕", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                        }
+                    }
+                } else {
+                    Surface(
+                        color = Color(0xFF1E293B),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, Color(0xFF475569))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.size(14.dp),
+                                color = Color(0xFFFFD700),
+                                strokeWidth = 2.dp,
+                                trackColor = Color(0xFF475569)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${timerSeconds}s অপেক্ষা করুন",
+                                color = Color(0xFFCBD5E1),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Center Ad Video Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .background(Color(0xFF2563EB).copy(alpha = 0.2f), CircleShape)
+                            .border(3.dp, Color(0xFF3B82F6), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Playing Ad",
+                            tint = Color(0xFF60A5FA),
+                            modifier = Modifier.size(46.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "🎬 স্পন্সরড ভিডিও $adIndex/৬",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "গার্মেন্টস হিরো অফিশিয়াল হাই-রেজুলেশন প্রিমিয়াম অ্যাড প্লে হচ্ছে...",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier
+                            .fillMaxWidth(0.85f)
+                            .height(7.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = Color(0xFFFFD700),
+                        trackColor = Color(0xFF334155)
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Surface(
+                        color = if (canClose) Color(0xFF16A34A).copy(alpha = 0.2f) else Color(0xFF2563EB).copy(alpha = 0.15f),
+                        border = BorderStroke(1.dp, if (canClose) Color(0xFF22C55E) else Color(0xFF3B82F6)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = if (canClose) "✓ ১০ সেকেণ্ড ভিউ সম্পন্ন হয়েছে! [অ্যাড বন্ধ করুন ✕] চাপুন" else "💰 সম্পূর্ণ ১০ সেকেণ্ড দেখলে বোনাস নিশ্চিত কার্যকর হবে",
+                            color = if (canClose) Color(0xFF4ADE80) else Color(0xFF93C5FD),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            // Bottom Section with Notice
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                Text(
+                    text = if (canClose) "✨ বিজ্ঞাপনটি সফলভাবে সম্পন্ন হয়েছে! উপরে [অ্যাড বন্ধ করুন ✕] চাপুন।" else "দয়া করে ${timerSeconds} সেকেণ্ড বিজ্ঞাপনটি দেখুন...",
+                    color = if (canClose) Color(0xFF4ADE80) else Color(0xFFCBD5E1),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
             }
         }
     }

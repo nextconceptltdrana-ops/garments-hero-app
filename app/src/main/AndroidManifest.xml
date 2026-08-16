@@ -42,21 +42,6 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3015642322344048~7749141018" />
 
-        <activity
-            android:name="com.google.android.gms.common.api.GoogleApiActivity"
-            android:enabled="false"
-            tools:node="replace" />
-
-        <!-- Disable automatic AdMob / GMS initialization to prevent GoogleApiManager errors on emulators -->
-        <provider
-            android:name="com.google.android.gms.ads.MobileAdsInitProvider"
-            tools:node="remove" />
-
-        <service
-            android:name="com.google.android.gms.ads.AdService"
-            android:enabled="false"
-            tools:node="replace" />
-
         <meta-data
             android:name="com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION"
             android:value="true" />

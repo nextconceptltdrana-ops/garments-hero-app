@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -132,15 +134,21 @@ fun GoogleCaptchaDialog(
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isVerifying by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     Dialog(
         onDismissRequest = { onDismiss() },
-        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false
+        )
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(6.dp)
+                .fillMaxWidth(0.92f)
+                .wrapContentHeight()
+                .padding(vertical = 16.dp)
                 .border(2.dp, Color(0xFF4285F4), RoundedCornerShape(16.dp)),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -149,7 +157,8 @@ fun GoogleCaptchaDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .verticalScroll(androidx.compose.foundation.rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Header (Google reCAPTCHA v3/v2 official look)
@@ -190,9 +199,10 @@ fun GoogleCaptchaDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "গুগল হাই-ইভ্যালুয়েটেড ক্যাপচার সার্ভিস (High eCPM Revenue Monitored) • লেভেল #$userLevel",
-                    fontSize = 11.sp,
-                    color = Color.Gray,
+                    text = "গুগল হাই-ইভ্যালুয়েটেড সিকিউরিটি ক্যাপচার • লেভেল #$userLevel",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF374151),
                     textAlign = TextAlign.Center
                 )
 
@@ -206,10 +216,18 @@ fun GoogleCaptchaDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .border(1.dp, Color(0xFFDADCE0), RoundedCornerShape(10.dp))
-                                .clickable {
+                                .clickable(enabled = !isChecked && !isCheckingAnim && !isVerifying) {
                                     if (!isChecked && !isCheckingAnim) {
                                         isCheckingAnim = true
-                                        isChecked = true
+                                        errorMessage = null
+                                        coroutineScope.launch {
+                                            delay(500)
+                                            isCheckingAnim = false
+                                            isChecked = true
+                                            isVerifying = true
+                                            delay(400)
+                                            onCaptchaVerified()
+                                        }
                                     }
                                 },
                             shape = RoundedCornerShape(10.dp),
@@ -237,7 +255,13 @@ fun GoogleCaptchaDialog(
                                             ),
                                         contentAlignment = Alignment.Center
                                     ) {
-                                        if (isChecked) {
+                                        if (isCheckingAnim) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(20.dp),
+                                                strokeWidth = 2.dp,
+                                                color = Color(0xFF4285F4)
+                                            )
+                                        } else if (isChecked) {
                                             Icon(
                                                 imageVector = Icons.Default.Check,
                                                 contentDescription = "Checked",
@@ -247,12 +271,22 @@ fun GoogleCaptchaDialog(
                                         }
                                     }
                                     Spacer(modifier = Modifier.width(14.dp))
-                                    Text(
-                                        text = "আমি রোবট নই (I'm not a robot)",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF222222)
-                                    )
+                                    Column {
+                                        Text(
+                                            text = "আমি রোবট নই (I'm not a robot)",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF222222)
+                                        )
+                                        if (isChecked) {
+                                            Text(
+                                                text = "ভেরিফিকেশন সফল! এগিয়ে যাচ্ছে...",
+                                                fontSize = 11.sp,
+                                                color = Color(0xFF0F9D58),
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
                                 }
 
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -375,8 +409,9 @@ fun GoogleCaptchaDialog(
                             ) {
                                 Text(
                                     text = "নিরাপত্তা সমীকরণটি সমাধান করুন:",
-                                    fontSize = 13.sp,
-                                    color = Color.DarkGray
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1F2937)
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Surface(
@@ -387,21 +422,37 @@ fun GoogleCaptchaDialog(
                                     Text(
                                         text = " Google Security: $mathA + $mathB = ? ",
                                         color = Color(0xFFFFD700),
-                                        fontSize = 18.sp,
+                                        fontSize = 19.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
                                 OutlinedTextField(
                                     value = userMathInput,
                                     onValueChange = {
                                         userMathInput = it
                                         errorMessage = null
                                     },
-                                    label = { Text("উত্তর লিখুন (যেমন: ${mathA + mathB})") },
+                                    label = { Text("উত্তর লিখুন (যেমন: ${mathA + mathB})", color = Color(0xFF374151), fontWeight = FontWeight.Medium) },
+                                    textStyle = androidx.compose.ui.text.TextStyle(
+                                        color = Color(0xFF111827),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    ),
                                     singleLine = true,
                                     shape = RoundedCornerShape(10.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = Color(0xFF1A73E8),
+                                        unfocusedBorderColor = Color(0xFF4B5563),
+                                        focusedTextColor = Color(0xFF111827),
+                                        unfocusedTextColor = Color(0xFF111827),
+                                        focusedLabelColor = Color(0xFF1A73E8),
+                                        unfocusedLabelColor = Color(0xFF374151),
+                                        cursorColor = Color(0xFF1A73E8),
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White
+                                    ),
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -421,9 +472,9 @@ fun GoogleCaptchaDialog(
                             ) {
                                 Text(
                                     text = "স্লাইডারটি টেনে ডানে নিয়ে ছেড়ে দিন:",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.DarkGray
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1F2937)
                                 )
                                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -432,6 +483,13 @@ fun GoogleCaptchaDialog(
                                     onValueChange = {
                                         sliderPosition = it
                                         errorMessage = null
+                                        if (it >= 90f && !isVerifying) {
+                                            isVerifying = true
+                                            coroutineScope.launch {
+                                                delay(400)
+                                                onCaptchaVerified()
+                                            }
+                                        }
                                     },
                                     valueRange = 0f..100f,
                                     modifier = Modifier.fillMaxWidth(),
@@ -443,9 +501,9 @@ fun GoogleCaptchaDialog(
 
                                 Text(
                                     text = if (sliderPosition >= 90f) "✅ সিকিউরিটি লক উন্মুক্ত!" else "স্লাইড করুন: ${sliderPosition.toInt()}%",
-                                    fontSize = 12.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (sliderPosition >= 90f) Color(0xFF2E7D32) else Color.Gray
+                                    color = if (sliderPosition >= 90f) Color(0xFF2E7D32) else Color(0xFF374151)
                                 )
                             }
                         }
@@ -456,8 +514,8 @@ fun GoogleCaptchaDialog(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = errorMessage!!,
-                        color = Color.Red,
-                        fontSize = 12.sp,
+                        color = Color(0xFFD32F2F),
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
@@ -496,8 +554,16 @@ fun GoogleCaptchaDialog(
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = onDismiss) {
-                            Text("বাতিল", color = Color.Gray)
+                        TextButton(
+                            onClick = onDismiss,
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFD32F2F))
+                        ) {
+                            Text(
+                                text = "বাতিল",
+                                color = Color(0xFFD32F2F),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
                         }
 
                         Spacer(modifier = Modifier.width(8.dp))
@@ -509,11 +575,8 @@ fun GoogleCaptchaDialog(
 
                                 when (captchaType) {
                                     CaptchaType.CHECKBOX -> {
-                                        if (isChecked) {
-                                            isValid = true
-                                        } else {
-                                            errorMessage = "অনুগ্রহ করে 'আমি রোবট নই' বক্সে টিক দিন।"
-                                        }
+                                        isChecked = true
+                                        isValid = true
                                     }
 
                                     CaptchaType.IMAGE_GRID -> {
@@ -652,7 +715,7 @@ fun SpinBarDialog(
 
                 // Spin Bar Options Preview Chips
                 Text(
-                    text = "স্পিন বারে সর্বোচ্চ ১০ পয়সা জেতার সুযোগ (৫০ জনে ১ জন!):",
+                    text = "স্পিন হুইলের পয়েন্ট ঘর (২ পয়সা, ৩ পয়সা, ৫ পয়সা, ১০ পয়সা...):",
                     fontSize = 11.sp,
                     color = Color.LightGray,
                     textAlign = TextAlign.Center
@@ -663,7 +726,7 @@ fun SpinBarDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    val prizes = listOf("১ পয়সা" to Color(0xFF42A5F5), "২ পয়সা" to Color(0xFF66BB6A), "৫ পয়সা" to Color(0xFFFFA726), "১০ পয়সা 🔥" to Color(0xFFFFD700))
+                    val prizes = listOf("১প" to Color(0xFF42A5F5), "২প" to Color(0xFF66BB6A), "৩প" to Color(0xFFAB47BC), "৫প" to Color(0xFFFFA726), "১০প 🔥" to Color(0xFFFFD700))
                     for ((label, color) in prizes) {
                         Surface(
                             color = color.copy(alpha = 0.2f),
@@ -686,19 +749,25 @@ fun SpinBarDialog(
                 // SPIN WHEEL / BAR VISUAL REPRESENTATION
                 Box(
                     modifier = Modifier
-                        .size(170.dp)
+                        .size(180.dp)
                         .clip(CircleShape)
                         .background(Color(0xFF252139))
                         .border(4.dp, Color(0xFFFFD700), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Wheel Canvas with 4 colored sectors
+                    // Wheel Canvas with 6 colored sectors
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val colors = listOf(Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFFB8C00), Color(0xFFE53935))
-                        val labels = listOf("১প", "২প", "৫প", "১০প")
-                        val sweep = 360f / 4f
+                        val colors = listOf(
+                            Color(0xFF1E88E5), // 1p
+                            Color(0xFF43A047), // 2p
+                            Color(0xFF8E24AA), // 3p
+                            Color(0xFFFB8C00), // 5p
+                            Color(0xFFFFB300), // 10p
+                            Color(0xFFE53935)  // 15p
+                        )
+                        val sweep = 360f / 6f
 
-                        for (i in 0 until 4) {
+                        for (i in 0 until 6) {
                             drawArc(
                                 color = colors[i],
                                 startAngle = currentRotationAngle + (i * sweep),
@@ -735,31 +804,40 @@ fun SpinBarDialog(
                                 isSpinning = true
                                 coroutineScope.launch {
                                     // Rotate wheel animation simulation
-                                    for (step in 1..20) {
-                                        currentRotationAngle += 18f
-                                        delay(80)
+                                    for (step in 1..24) {
+                                        currentRotationAngle += 22.5f
+                                        delay(70)
                                     }
 
-                                    // Determine Outcome based on Prompt Rules:
-                                    // Max 10 Paisa Jackpot (1 in 50 chance -> 2% probability)
+                                    // Determine Outcome based on probabilities:
                                     val rand = Random.nextInt(100) // 0..99
                                     when {
-                                        rand < 2 -> { // 2% chance (1 in 50) -> 10 Paisa (0.10 Taka Jackpot)
+                                        rand < 3 -> { // 3% chance -> 15 Paisa (0.15 Taka Mega Jackpot)
+                                            wonBonusTaka = 0.15
+                                            isJackpotWinner = true
+                                            spinMessage = "🎉 মেগা জ্যাকপট! আপনি ১৫ পয়সা (৳০.১৫) ড্র বোনাস জিতেছেন!"
+                                        }
+                                        rand in 3..12 -> { // 10% chance -> 10 Paisa (0.10 Taka Jackpot)
                                             wonBonusTaka = 0.10
                                             isJackpotWinner = true
-                                            spinMessage = "🎉 মেগা জ্যাকপট! আপনি ১০ পয়সা (৳০.১০) বোনাস জিতেছেন!"
+                                            spinMessage = "🎉 জ্যাকপট! আপনি ১০ পয়সা (৳০.১০) বোনাস জিতেছেন!"
                                         }
-                                        rand in 2..26 -> { // 25% chance -> 5 Paisa (0.05 Taka)
+                                        rand in 13..32 -> { // 20% chance -> 5 Paisa (0.05 Taka)
                                             wonBonusTaka = 0.05
                                             isJackpotWinner = false
                                             spinMessage = "⭐ অভিনন্দন! আপনি ৫ পয়সা (৳০.০৫) ড্র বোনাস পেয়েছেন!"
                                         }
-                                        rand in 27..61 -> { // 35% chance -> 2 Paisa (0.02 Taka)
+                                        rand in 33..62 -> { // 30% chance -> 3 Paisa (0.03 Taka)
+                                            wonBonusTaka = 0.03
+                                            isJackpotWinner = false
+                                            spinMessage = "✨ অভিনন্দন! আপনি ৩ পয়সা (৳০.০৩) ড্র বোনাস পেয়েছেন!"
+                                        }
+                                        rand in 63..87 -> { // 25% chance -> 2 Paisa (0.02 Taka)
                                             wonBonusTaka = 0.02
                                             isJackpotWinner = false
                                             spinMessage = "✨ অভিনন্দন! আপনি ২ পয়সা (৳০.০২) ড্র বোনাস পেয়েছেন!"
                                         }
-                                        else -> { // 38% chance -> 1 Paisa (0.01 Taka)
+                                        else -> { // 12% chance -> 1 Paisa (0.01 Taka)
                                             wonBonusTaka = 0.01
                                             isJackpotWinner = false
                                             spinMessage = "👍 অভিনন্দন! আপনি ১ পয়সা (৳০.০১) ড্র বোনাস পেয়েছেন!"

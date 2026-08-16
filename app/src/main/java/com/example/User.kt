@@ -11,8 +11,8 @@ data class User(
     val createdAt: Long = System.currentTimeMillis(),
     val currentLevel: Int = 1,
     val completedLevels: Int = 0,
-    val rewardCoins: Long = 100,
-    val earningsTaka: Double = 10.0,
+    val rewardCoins: Long = 0,
+    val earningsTaka: Double = 0.0,
     val referralsCount: Int = 0,
     val avatarUrl: String = ""
 ) {

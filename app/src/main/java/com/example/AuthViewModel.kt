@@ -52,19 +52,56 @@ class AuthViewModel : ViewModel() {
     private val _isAdminMode = MutableStateFlow(false)
     val isAdminMode: StateFlow<Boolean> = _isAdminMode.asStateFlow()
 
-    // Ad Flow & Captcha States
-    enum class AdFlowStep {
-        IDLE, AD1, AD2, SHOW_CAPTCHA, AD3, AD4, SHOW_SPIN_BAR, AD5, AD6, COMPLETED
+    // Robust State Machine for Quiz Flow
+    // Sequence: Start -> Ad1 -> Ad2 -> Captcha -> Ad3 -> Ad4 -> Spin -> Ad5 -> Ad6 -> Level Update
+    sealed class QuizFlowState {
+        object Idle : QuizFlowState()
+        object Ad1 : QuizFlowState()
+        object Ad2 : QuizFlowState()
+        object Captcha : QuizFlowState()
+        object Ad3 : QuizFlowState()
+        object Ad4 : QuizFlowState()
+        object Spin : QuizFlowState()
+        object Ad5 : QuizFlowState()
+        object Ad6 : QuizFlowState()
+        object LevelUpdate : QuizFlowState()
+        data class Completed(val message: String) : QuizFlowState()
     }
 
-    private val _adFlowStep = MutableStateFlow(AdFlowStep.IDLE)
-    val adFlowStep: StateFlow<AdFlowStep> = _adFlowStep.asStateFlow()
+    data class LevelCompletionData(
+        val completedLevel: Int,
+        val nextLevel: Int,
+        val takaEarned: Double,
+        val totalBalance: Double,
+        val bonusTaka: Double
+    )
+
+    private val _levelCompletionData = MutableStateFlow<LevelCompletionData?>(null)
+    val levelCompletionData: StateFlow<LevelCompletionData?> = _levelCompletionData.asStateFlow()
+
+    private val _quizFlowState = MutableStateFlow<QuizFlowState>(QuizFlowState.Idle)
+    val quizFlowState: StateFlow<QuizFlowState> = _quizFlowState.asStateFlow()
+
+    private val _isFlowBusy = MutableStateFlow(false)
+    val isFlowBusy: StateFlow<Boolean> = _isFlowBusy.asStateFlow()
 
     private val _showCaptchaDialog = MutableStateFlow(false)
     val showCaptchaDialog: StateFlow<Boolean> = _showCaptchaDialog.asStateFlow()
 
     private val _showSpinBarDialog = MutableStateFlow(false)
     val showSpinBarDialog: StateFlow<Boolean> = _showSpinBarDialog.asStateFlow()
+
+    private val _showAdOverlay = MutableStateFlow(false)
+    val showAdOverlay: StateFlow<Boolean> = _showAdOverlay.asStateFlow()
+
+    private val _currentAdTitle = MutableStateFlow("অ্যাড ১/৬")
+    val currentAdTitle: StateFlow<String> = _currentAdTitle.asStateFlow()
+
+    private val _currentAdIndex = MutableStateFlow(1)
+    val currentAdIndex: StateFlow<Int> = _currentAdIndex.asStateFlow()
+
+    private var onAdDismissedCallback: (() -> Unit)? = null
+    private var pendingSpinBonusTaka: Double = 0.0
 
     private val _adStatusMessage = MutableStateFlow<String?>(null)
     val adStatusMessage: StateFlow<String?> = _adStatusMessage.asStateFlow()
@@ -272,67 +309,132 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    fun startEarningAdFlow(activity: android.app.Activity) {
-        _adFlowStep.value = AdFlowStep.AD1
-        _adStatusMessage.value = "অ্যাড ১/৬ চালু হচ্ছে..."
+    fun playAd(
+        activity: android.app.Activity,
+        adTitle: String,
+        adIndex: Int,
+        onAdClosed: () -> Unit
+    ) {
+        _currentAdTitle.value = adTitle
+        _currentAdIndex.value = adIndex
+        _adStatusMessage.value = "$adTitle চালু হচ্ছে... (বিজ্ঞাপন শেষ হলে স্বয়ংক্রিয়ভাবে পরবর্তী ধাপে যাবে)"
 
-        AdManager.showFullScreenAd(activity) {
-            _adFlowStep.value = AdFlowStep.AD2
-            _adStatusMessage.value = "অ্যাড ২/৬ চালু হচ্ছে..."
-            AdManager.showFullScreenAd(activity) {
-                _adFlowStep.value = AdFlowStep.SHOW_CAPTCHA
+        AdManager.showFullScreenAd(
+            activity = activity,
+            onFallbackToSimulated = {
+                onAdDismissedCallback = onAdClosed
+                _showAdOverlay.value = true
+            },
+            onAdDismissed = {
+                onAdClosed()
+            }
+        )
+    }
+
+    fun dismissAdOverlay() {
+        _showAdOverlay.value = false
+        val callback = onAdDismissedCallback
+        onAdDismissedCallback = null
+        callback?.invoke()
+    }
+
+    // Sequence: Start -> Ad1 -> Ad2 -> Captcha -> Ad3 -> Ad4 -> Spin -> Ad5 -> Ad6 -> Level Update
+    fun startQuizFlow(activity: android.app.Activity) {
+        if (_isFlowBusy.value) return
+        _isFlowBusy.value = true
+        _quizFlowState.value = QuizFlowState.Ad1
+
+        playAd(activity, "অ্যাড ১/৬", 1) {
+            _quizFlowState.value = QuizFlowState.Ad2
+            playAd(activity, "অ্যাড ২/৬", 2) {
+                _quizFlowState.value = QuizFlowState.Captcha
                 _showCaptchaDialog.value = true
-                _adStatusMessage.value = "গুগল ক্যাপচার সিকিউরিটি ভেরিফিকেশন করুন..."
+                _adStatusMessage.value = "গুগল সিকিউরিটি ক্যাপচা সম্পন্ন করুন..."
             }
         }
     }
 
+    // Backwards-compatible alias for startQuizFlow
+    fun startEarningAdFlow(activity: android.app.Activity) {
+        startQuizFlow(activity)
+    }
+
     fun onCaptchaVerified(activity: android.app.Activity) {
         _showCaptchaDialog.value = false
-        _adFlowStep.value = AdFlowStep.AD3
-        _adStatusMessage.value = "ক্যাপচার সফল! অ্যাড ৩/৬ চালু হচ্ছে..."
+        _quizFlowState.value = QuizFlowState.Ad3
 
-        AdManager.showFullScreenAd(activity) {
-            _adFlowStep.value = AdFlowStep.AD4
-            _adStatusMessage.value = "অ্যাড ৪/৬ চালু হচ্ছে..."
-            AdManager.showFullScreenAd(activity) {
-                _adFlowStep.value = AdFlowStep.SHOW_SPIN_BAR
+        playAd(activity, "অ্যাড ৩/৬", 3) {
+            _quizFlowState.value = QuizFlowState.Ad4
+            playAd(activity, "অ্যাড ৪/৬", 4) {
+                _quizFlowState.value = QuizFlowState.Spin
                 _showSpinBarDialog.value = true
-                _adStatusMessage.value = "স্পিন বার ঘুরিয়ে বোনাস জিতে নিন..."
+                _adStatusMessage.value = "লাকি স্পিন বার ঘুরিয়ে বোনাস জিতে নিন..."
             }
         }
     }
 
     fun onSpinCompletedAndPlayFinalAds(activity: android.app.Activity, spinBonusTaka: Double) {
         _showSpinBarDialog.value = false
-        _adFlowStep.value = AdFlowStep.AD5
-        _adStatusMessage.value = "স্পিন বোনাস সংরক্ষিত! অ্যাড ৫/৬ চালু হচ্ছে..."
+        pendingSpinBonusTaka = spinBonusTaka
+        _quizFlowState.value = QuizFlowState.Ad5
 
-        AdManager.showFullScreenAd(activity) {
-            _adFlowStep.value = AdFlowStep.AD6
-            _adStatusMessage.value = "অ্যাড ৬/৬ চালু হচ্ছে..."
-            AdManager.showFullScreenAd(activity) {
-                val totalTakaEarned = 0.20 + spinBonusTaka
-                val totalCoinsEarned = 20L + (spinBonusTaka * 100).toLong()
+        playAd(activity, "অ্যাড ৫/৬", 5) {
+            _quizFlowState.value = QuizFlowState.Ad6
+            playAd(activity, "অ্যাড ৬/৬", 6) {
+                _quizFlowState.value = QuizFlowState.LevelUpdate
+                _adStatusMessage.value = "ফায়ারবেসে লেভেল ও ব্যালেন্স আপডেট হচ্ছে..."
+
+                val totalTakaEarned = 0.25 + pendingSpinBonusTaka
+                val totalCoinsEarned = 25L + (pendingSpinBonusTaka * 100).toLong()
                 val previousLevel = _currentUser.value?.currentLevel ?: 1
 
-                completeCurrentLevel(activity.applicationContext, takaEarned = totalTakaEarned, coinsEarned = totalCoinsEarned) { updatedUser ->
-                    _adFlowStep.value = AdFlowStep.COMPLETED
-                    _adStatusMessage.value = "🎉 অভিনন্দন! লেভেল #$previousLevel সফলভাবে সম্পন্ন হয়েছে। ৳${String.format(java.util.Locale.US, "%.2f", totalTakaEarned)} (২০প বেসিক + ৳${String.format(java.util.Locale.US, "%.2f", spinBonusTaka)} বোনাস) একাউন্টে যুক্ত হয়েছে।"
+                completeCurrentLevel(
+                    activity.applicationContext,
+                    takaEarned = totalTakaEarned,
+                    coinsEarned = totalCoinsEarned
+                ) { updatedUser ->
+                    val resultMsg = "🎉 অভিনন্দন! লেভেল #$previousLevel সফলভাবে সম্পন্ন হয়েছে। ৳${String.format(java.util.Locale.US, "%.2f", totalTakaEarned)} (২৫প বেসিক + ৳${String.format(java.util.Locale.US, "%.2f", pendingSpinBonusTaka)} বোনাস) একাউন্টে যুক্ত হয়েছে।"
+                    _quizFlowState.value = QuizFlowState.Completed(resultMsg)
+                    _adStatusMessage.value = resultMsg
+                    _isFlowBusy.value = false
+
+                    // Show Next Level prompt for continuous targeted earning flow
+                    _levelCompletionData.value = LevelCompletionData(
+                        completedLevel = previousLevel,
+                        nextLevel = updatedUser.currentLevel,
+                        takaEarned = totalTakaEarned,
+                        totalBalance = updatedUser.earningsTaka,
+                        bonusTaka = pendingSpinBonusTaka
+                    )
                 }
             }
         }
     }
 
+    fun startNextLevel(activity: android.app.Activity) {
+        _levelCompletionData.value = null
+        _quizFlowState.value = QuizFlowState.Idle
+        _adStatusMessage.value = null
+        startQuizFlow(activity)
+    }
+
+    fun cancelNextLevel() {
+        _levelCompletionData.value = null
+        _quizFlowState.value = QuizFlowState.Idle
+        _adStatusMessage.value = "লেভেল সম্পন্ন হয়েছে। আপনি পরবর্তীতে যেকোনো সময় আবার শুরু করতে পারবেন।"
+    }
+
     fun dismissCaptcha() {
         _showCaptchaDialog.value = false
-        _adFlowStep.value = AdFlowStep.IDLE
+        _quizFlowState.value = QuizFlowState.Idle
+        _isFlowBusy.value = false
         _adStatusMessage.value = null
     }
 
     fun dismissSpinBarDialog() {
         _showSpinBarDialog.value = false
-        _adFlowStep.value = AdFlowStep.IDLE
+        _quizFlowState.value = QuizFlowState.Idle
+        _isFlowBusy.value = false
         _adStatusMessage.value = null
     }
 
