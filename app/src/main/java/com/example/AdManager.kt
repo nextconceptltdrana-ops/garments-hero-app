@@ -167,46 +167,16 @@ object AdManager {
         return builder.build()
     }
 
-    fun showFullScreenAd(
-        activity: Activity,
-        onAdDismissed: () -> Unit
-    ) {
-        showFullScreenAd(activity, null, onAdDismissed)
-    }
-
     /**
-     * Show a full screen ad (attempts Rewarded Interstitial first, fallback to Rewarded, fallback to simulated ad callback on error/emulator)
+     * Show standard AdMob Full Screen Ad (Rewarded Interstitial / Rewarded)
+     * using official Google Android SDK FullScreenContentCallback listeners.
      */
     fun showFullScreenAd(
         activity: Activity,
-        onFallbackToSimulated: (() -> Unit)? = null,
         onAdDismissed: () -> Unit
     ) {
-        // In preview/emulator environments, Google AdMob AdActivity video player can freeze emulator input.
-        // We safely show the simulated Ad overlay in emulator, while preserving real AdMob on real devices/APK.
-        if (isEmulator()) {
-            Log.i(TAG, "Running in Emulator/Preview environment. Using in-app smooth Ad UI to prevent freezing.")
-            if (onFallbackToSimulated != null) {
-                onFallbackToSimulated()
-            } else {
-                onAdDismissed()
-            }
-            return
-        }
-
         initialize(activity)
-        
-        if (!isGmsAvailable) {
-            Log.w(TAG, "Play Services not functional on this device. Triggering fallback ad presentation.")
-            if (onFallbackToSimulated != null) {
-                onFallbackToSimulated()
-            } else {
-                onAdDismissed()
-            }
-            return
-        }
-
-        Log.d(TAG, "Loading High-eCPM Full Screen Ad for user flow...")
+        Log.d(TAG, "Requesting and presenting standard Google AdMob Ad...")
 
         try {
             val adRequest = createHighEcpmAdRequest()
@@ -217,52 +187,47 @@ object AdManager {
                 adRequest,
                 object : RewardedInterstitialAdLoadCallback() {
                     override fun onAdLoaded(ad: RewardedInterstitialAd) {
-                        Log.d(TAG, "High-eCPM RewardedInterstitialAd loaded successfully")
-                        try {
-                            ad.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
-                                override fun onAdDismissedFullScreenContent() {
-                                    Log.d(TAG, "Ad dismissed")
-                                    onAdDismissed()
-                                }
-
-                                override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
-                                    Log.e(TAG, "Ad failed to show: ${error.message}")
-                                    if (onFallbackToSimulated != null) {
-                                        onFallbackToSimulated()
-                                    } else {
-                                        onAdDismissed()
-                                    }
-                                }
-                            }
-                            ad.show(activity) { rewardItem ->
-                                Log.d(TAG, "User earned ad reward: ${rewardItem.amount} ${rewardItem.type}")
-                            }
-                        } catch (e: Throwable) {
-                            Log.e(TAG, "Error showing RewardedInterstitialAd: ${e.message}", e)
-                            if (onFallbackToSimulated != null) {
-                                onFallbackToSimulated()
-                            } else {
+                        Log.d(TAG, "RewardedInterstitialAd loaded successfully")
+                        ad.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
+                            override fun onAdDismissedFullScreenContent() {
+                                Log.d(TAG, "Ad dismissed by user")
                                 onAdDismissed()
                             }
+
+                            override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
+                                Log.e(TAG, "Ad failed to show: ${error.message}")
+                                onAdDismissed()
+                            }
+
+                            override fun onAdShowedFullScreenContent() {
+                                Log.d(TAG, "Ad presented full screen")
+                            }
+                        }
+                        try {
+                            ad.show(activity) { rewardItem ->
+                                Log.d(TAG, "User earned reward: ${rewardItem.amount} ${rewardItem.type}")
+                            }
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "Exception showing RewardedInterstitialAd: ${e.message}", e)
+                            onAdDismissed()
                         }
                     }
 
                     override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                        Log.w(TAG, "RewardedInterstitialAd load failed: ${loadAdError.message}. Trying High-eCPM RewardedAd...")
-                        loadRewardedAd(activity, onAdDismissed, onFallbackToSimulated)
+                        Log.w(TAG, "RewardedInterstitialAd load failed: ${loadAdError.message}. Falling back to RewardedAd...")
+                        loadRewardedAd(activity, onAdDismissed)
                     }
                 }
             )
         } catch (e: Throwable) {
-            Log.e(TAG, "Error initiating RewardedInterstitialAd load: ${e.message}", e)
-            loadRewardedAd(activity, onAdDismissed, onFallbackToSimulated)
+            Log.e(TAG, "Error initiating RewardedInterstitialAd: ${e.message}", e)
+            loadRewardedAd(activity, onAdDismissed)
         }
     }
 
     private fun loadRewardedAd(
         activity: Activity,
-        onAdDismissed: () -> Unit,
-        onFallbackToSimulated: (() -> Unit)? = null
+        onAdDismissed: () -> Unit
     ) {
         try {
             val adRequest = createHighEcpmAdRequest()
@@ -273,52 +238,40 @@ object AdManager {
                 object : RewardedAdLoadCallback() {
                     override fun onAdLoaded(ad: RewardedAd) {
                         Log.d(TAG, "RewardedAd loaded successfully")
-                        try {
-                            ad.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
-                                override fun onAdDismissedFullScreenContent() {
-                                    Log.d(TAG, "Rewarded Ad dismissed")
-                                    onAdDismissed()
-                                }
-
-                                override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
-                                    Log.e(TAG, "Rewarded Ad failed to show: ${error.message}")
-                                    if (onFallbackToSimulated != null) {
-                                        onFallbackToSimulated()
-                                    } else {
-                                        onAdDismissed()
-                                    }
-                                }
-                            }
-                            ad.show(activity) { rewardItem ->
-                                Log.d(TAG, "RewardedAd reward: ${rewardItem.amount}")
-                            }
-                        } catch (e: Throwable) {
-                            Log.e(TAG, "Error showing RewardedAd: ${e.message}", e)
-                            if (onFallbackToSimulated != null) {
-                                onFallbackToSimulated()
-                            } else {
+                        ad.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
+                            override fun onAdDismissedFullScreenContent() {
+                                Log.d(TAG, "RewardedAd dismissed by user")
                                 onAdDismissed()
                             }
+
+                            override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
+                                Log.e(TAG, "RewardedAd failed to show: ${error.message}")
+                                onAdDismissed()
+                            }
+
+                            override fun onAdShowedFullScreenContent() {
+                                Log.d(TAG, "RewardedAd presented full screen")
+                            }
+                        }
+                        try {
+                            ad.show(activity) { rewardItem ->
+                                Log.d(TAG, "RewardedAd reward earned: ${rewardItem.amount}")
+                            }
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "Exception showing RewardedAd: ${e.message}", e)
+                            onAdDismissed()
                         }
                     }
 
                     override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                         Log.e(TAG, "RewardedAd load failed: ${loadAdError.message}")
-                        if (onFallbackToSimulated != null) {
-                            onFallbackToSimulated()
-                        } else {
-                            onAdDismissed()
-                        }
+                        onAdDismissed()
                     }
                 }
             )
         } catch (e: Throwable) {
             Log.e(TAG, "Error initiating RewardedAd load: ${e.message}", e)
-            if (onFallbackToSimulated != null) {
-                onFallbackToSimulated()
-            } else {
-                onAdDismissed()
-            }
+            onAdDismissed()
         }
     }
 }

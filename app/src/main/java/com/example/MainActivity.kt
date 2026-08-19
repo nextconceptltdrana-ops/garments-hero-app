@@ -17,6 +17,8 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     try {
         AdManager.initialize(this)
+        // Flush any pending unsynced points from previous session/crash
+        FirebaseUserManager.syncPendingProgressToFirestore(applicationContext)
     } catch (e: Throwable) {
         // Safe fallback if initialization fails
     }
@@ -32,6 +34,21 @@ class MainActivity : ComponentActivity() {
         }
       }
     }
+  }
+
+  override fun onPause() {
+    super.onPause()
+    FirebaseUserManager.syncPendingProgressToFirestore(applicationContext)
+  }
+
+  override fun onStop() {
+    super.onStop()
+    FirebaseUserManager.syncPendingProgressToFirestore(applicationContext)
+  }
+
+  override fun onDestroy() {
+    super.onDestroy()
+    FirebaseUserManager.syncPendingProgressToFirestore(applicationContext)
   }
 }
 

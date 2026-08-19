@@ -19,6 +19,9 @@ object FirebaseUserManager {
     private const val KEY_REFERRALS_COUNT = "user_referrals_count"
     private const val KEY_AVATAR_URL = "user_avatar_url"
     private const val KEY_IS_LOGGED_IN = "is_logged_in"
+    private const val KEY_UNSYNCED_EARNINGS = "unsynced_earnings_taka"
+    private const val KEY_UNSYNCED_COINS = "unsynced_reward_coins"
+    private const val KEY_UNSYNCED_LEVELS = "unsynced_completed_levels"
 
     private val firestore: FirebaseFirestore by lazy {
         val db = FirebaseFirestore.getInstance()
@@ -220,6 +223,11 @@ object FirebaseUserManager {
         }
     }
 
+    /**
+     * Local Point & Level Accumulation (ZERO Firestore Writes During Gameplay)
+     * All earned points, coins, and levels are stored locally in SharedPreferences and memory.
+     * UI updates instantly with zero latency, completely staying within free daily quota.
+     */
     fun updateUserProgress(
         context: Context,
         user: User,
@@ -239,25 +247,86 @@ object FirebaseUserManager {
             earningsTaka = updatedTaka
         )
 
+        // 1. Save full updated user in local session
         saveSession(context, updatedUser)
 
-        if (user.mobile.isNotEmpty()) {
-            firestore.collection("users").document(user.mobile)
-                .update(
-                    mapOf(
-                        "currentLevel" to nextLevel,
-                        "completedLevels" to updatedCompleted,
-                        "rewardCoins" to updatedCoins,
-                        "earningsTaka" to updatedTaka
-                    )
-                ).addOnSuccessListener {
-                    Log.d(TAG, "User progress updated in Firestore for level $nextLevel")
-                }.addOnFailureListener { e ->
-                    Log.w(TAG, "Failed to update progress in Firestore: ${e.message}")
-                }
+        // 2. Buffer unsynced diff in SharedPreferences for crash safety
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val currentUnsyncedTaka = prefs.getFloat(KEY_UNSYNCED_EARNINGS, 0.0f) + takaEarned.toFloat()
+        val currentUnsyncedCoins = prefs.getLong(KEY_UNSYNCED_COINS, 0L) + coinsEarned
+        val currentUnsyncedLevels = prefs.getInt(KEY_UNSYNCED_LEVELS, 0) + 1
+
+        prefs.edit()
+            .putFloat(KEY_UNSYNCED_EARNINGS, currentUnsyncedTaka)
+            .putLong(KEY_UNSYNCED_COINS, currentUnsyncedCoins)
+            .putInt(KEY_UNSYNCED_LEVELS, currentUnsyncedLevels)
+            .apply()
+
+        Log.d(TAG, "Locally accumulated progress: +$takaEarned Taka, +$coinsEarned Coins (Unsynced buffer: $currentUnsyncedTaka Taka, $currentUnsyncedLevels levels). ZERO Firestore writes executed.")
+
+        // Immediate zero-latency UI update callback
+        onResult(updatedUser)
+    }
+
+    /**
+     * Single Batch Sync on App Pause / Stop / Destroy / Startup
+     * Synchronizes accumulated points, coins, and levels to Firestore in ONE atomic write.
+     * Uses FieldValue.increment() to guarantee zero data loss.
+     */
+    @Synchronized
+    fun syncPendingProgressToFirestore(
+        context: Context,
+        onComplete: ((success: Boolean) -> Unit)? = null
+    ) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val mobile = prefs.getString(KEY_MOBILE, "") ?: ""
+        if (mobile.isEmpty()) {
+            onComplete?.invoke(false)
+            return
         }
 
-        onResult(updatedUser)
+        val pendingTaka = prefs.getFloat(KEY_UNSYNCED_EARNINGS, 0.0f).toDouble()
+        val pendingCoins = prefs.getLong(KEY_UNSYNCED_COINS, 0L)
+        val pendingLevels = prefs.getInt(KEY_UNSYNCED_LEVELS, 0)
+        val currentLevel = prefs.getInt(KEY_CURRENT_LEVEL, 1)
+
+        if (pendingTaka <= 0.0 && pendingCoins <= 0L && pendingLevels <= 0) {
+            Log.d(TAG, "No pending points to sync. Firestore write quota preserved.")
+            onComplete?.invoke(true)
+            return
+        }
+
+        Log.d(TAG, "Syncing batch progress to Firestore for $mobile: +$pendingTaka Taka, +$pendingCoins Coins, +$pendingLevels Levels")
+
+        val updates = mapOf(
+            "earningsTaka" to com.google.firebase.firestore.FieldValue.increment(pendingTaka),
+            "rewardCoins" to com.google.firebase.firestore.FieldValue.increment(pendingCoins),
+            "completedLevels" to com.google.firebase.firestore.FieldValue.increment(pendingLevels.toLong()),
+            "currentLevel" to currentLevel
+        )
+
+        firestore.collection("users").document(mobile)
+            .set(updates, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                Log.d(TAG, "Successfully synced batch progress to Firestore in single atomic write.")
+                // Atomically subtract or reset the synced buffer
+                val currentP = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val remainingTaka = (currentP.getFloat(KEY_UNSYNCED_EARNINGS, 0.0f) - pendingTaka.toFloat()).coerceAtLeast(0.0f)
+                val remainingCoins = (currentP.getLong(KEY_UNSYNCED_COINS, 0L) - pendingCoins).coerceAtLeast(0L)
+                val remainingLevels = (currentP.getInt(KEY_UNSYNCED_LEVELS, 0) - pendingLevels).coerceAtLeast(0)
+
+                currentP.edit()
+                    .putFloat(KEY_UNSYNCED_EARNINGS, remainingTaka)
+                    .putLong(KEY_UNSYNCED_COINS, remainingCoins)
+                    .putInt(KEY_UNSYNCED_LEVELS, remainingLevels)
+                    .apply()
+
+                onComplete?.invoke(true)
+            }
+            .addOnFailureListener { e ->
+                Log.w(TAG, "Batch sync to Firestore failed (will retry on next app exit/launch): ${e.message}")
+                onComplete?.invoke(false)
+            }
     }
 
     fun submitWithdrawal(
@@ -279,7 +348,7 @@ object FirebaseUserManager {
         }
 
         if (user.earningsTaka < amountTaka) {
-            onResult(false, "আপনার অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই (বর্তমান ব্যালেন্স: ৳${String.format("%.2f", user.earningsTaka)})", null)
+            onResult(false, "আপনার অ্যাকাউন্টে পর্যাপ্ত ব্যালেন্স নেই (বর্তমান ব্যালেন্স: ৳${String.format(java.util.Locale.US, "%.2f", user.earningsTaka)})", null)
             return
         }
 
@@ -288,33 +357,36 @@ object FirebaseUserManager {
             return
         }
 
-        val updatedTaka = user.earningsTaka - amountTaka
-        val updatedUser = user.copy(earningsTaka = updatedTaka)
+        // Sync pending progress first to ensure Firestore balance is up-to-date
+        syncPendingProgressToFirestore(context) {
+            val updatedTaka = (user.earningsTaka - amountTaka).coerceAtLeast(0.0)
+            val updatedUser = user.copy(earningsTaka = updatedTaka)
 
-        val withdrawalReq = mapOf(
-            "userMobile" to user.mobile,
-            "userName" to user.name,
-            "paymentMethod" to paymentMethod,
-            "paymentNumber" to paymentNumber,
-            "amountTaka" to amountTaka,
-            "requestedAt" to System.currentTimeMillis(),
-            "status" to "PENDING"
-        )
+            val withdrawalReq = mapOf(
+                "userMobile" to user.mobile,
+                "userName" to user.name,
+                "paymentMethod" to paymentMethod,
+                "paymentNumber" to paymentNumber,
+                "amountTaka" to amountTaka,
+                "requestedAt" to System.currentTimeMillis(),
+                "status" to "PENDING"
+            )
 
-        firestore.collection("withdrawals")
-            .add(withdrawalReq)
-            .addOnSuccessListener {
-                firestore.collection("users").document(user.mobile)
-                    .update("earningsTaka", updatedTaka)
-                saveSession(context, updatedUser)
-                onResult(true, "উইথড্র রিকোয়েস্ট জমা হয়েছে! শীঘ্রই পেমেন্ট প্রসেস করা হবে।", updatedUser)
-            }
-            .addOnFailureListener { e ->
-                Log.w(TAG, "Withdrawal failed in Firestore (saved locally): ${e.message}")
-                // Fallback offline deduction
-                saveSession(context, updatedUser)
-                onResult(true, "উইথড্র রিকোয়েস্ট সংরক্ষিত হয়েছে (অফলাইন মোড)।", updatedUser)
-            }
+            firestore.collection("withdrawals")
+                .add(withdrawalReq)
+                .addOnSuccessListener {
+                    firestore.collection("users").document(user.mobile)
+                        .update("earningsTaka", updatedTaka)
+                    saveSession(context, updatedUser)
+                    onResult(true, "উইথড্র রিকোয়েস্ট জমা হয়েছে! শীঘ্রই পেমেন্ট প্রসেস করা হবে।", updatedUser)
+                }
+                .addOnFailureListener { e ->
+                    Log.w(TAG, "Withdrawal failed in Firestore (saved locally): ${e.message}")
+                    // Fallback offline deduction
+                    saveSession(context, updatedUser)
+                    onResult(true, "উইথড্র রিকোয়েস্ট সংরক্ষিত হয়েছে (অফলাইন মোড)।", updatedUser)
+                }
+        }
     }
 
     fun fetchAllWithdrawals(onResult: (List<WithdrawalRequest>) -> Unit) {

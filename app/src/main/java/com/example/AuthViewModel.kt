@@ -215,16 +215,19 @@ class AuthViewModel : ViewModel() {
         val saved = FirebaseUserManager.getSavedSession(context)
         _currentUser.value = saved
 
-        // Sync fresh level & user details directly from Firestore
-        if (saved != null && saved.mobile.isNotEmpty()) {
-            FirebaseUserManager.loginUser(context, saved.mobile) { success, _, updatedUser ->
-                if (success && updatedUser != null) {
-                    _currentUser.value = updatedUser
-                    if (!hasPlayedSessionAd) {
-                        hasPlayedSessionAd = true
-                        val activity = findActivity(context)
-                        if (activity != null) {
-                            playLoginAdForAdmin(activity)
+        // Sync any cached unsynced points from previous session or unexpected close
+        FirebaseUserManager.syncPendingProgressToFirestore(context) {
+            // Sync fresh level & user details directly from Firestore
+            if (saved != null && saved.mobile.isNotEmpty()) {
+                FirebaseUserManager.loginUser(context, saved.mobile) { success, _, updatedUser ->
+                    if (success && updatedUser != null) {
+                        _currentUser.value = updatedUser
+                        if (!hasPlayedSessionAd) {
+                            hasPlayedSessionAd = true
+                            val activity = findActivity(context)
+                            if (activity != null) {
+                                playLoginAdForAdmin(activity)
+                            }
                         }
                     }
                 }
@@ -321,10 +324,6 @@ class AuthViewModel : ViewModel() {
 
         AdManager.showFullScreenAd(
             activity = activity,
-            onFallbackToSimulated = {
-                onAdDismissedCallback = onAdClosed
-                _showAdOverlay.value = true
-            },
             onAdDismissed = {
                 onAdClosed()
             }
@@ -338,7 +337,7 @@ class AuthViewModel : ViewModel() {
         callback?.invoke()
     }
 
-    // Sequence: Start -> Ad1 -> Ad2 -> Captcha -> Ad3 -> Ad4 -> Spin -> Ad5 -> Ad6 -> Level Update
+    // Sequence: Start -> Ad1 -> Ad2 -> Security Check -> Ad3 -> Ad4 -> Spin -> Ad5 -> Ad6 -> Level Update
     fun startQuizFlow(activity: android.app.Activity) {
         if (_isFlowBusy.value) return
         _isFlowBusy.value = true
@@ -349,7 +348,7 @@ class AuthViewModel : ViewModel() {
             playAd(activity, "অ্যাড ২/৬", 2) {
                 _quizFlowState.value = QuizFlowState.Captcha
                 _showCaptchaDialog.value = true
-                _adStatusMessage.value = "গুগল সিকিউরিটি ক্যাপচা সম্পন্ন করুন..."
+                _adStatusMessage.value = "সিকিউরিটি ভেরিফিকেশন সম্পন্ন করুন..."
             }
         }
     }
@@ -382,7 +381,7 @@ class AuthViewModel : ViewModel() {
             _quizFlowState.value = QuizFlowState.Ad6
             playAd(activity, "অ্যাড ৬/৬", 6) {
                 _quizFlowState.value = QuizFlowState.LevelUpdate
-                _adStatusMessage.value = "ফায়ারবেসে লেভেল ও ব্যালেন্স আপডেট হচ্ছে..."
+                _adStatusMessage.value = "লেভেল ও পয়েন্ট যোগ হচ্ছে..."
 
                 val totalTakaEarned = 0.25 + pendingSpinBonusTaka
                 val totalCoinsEarned = 25L + (pendingSpinBonusTaka * 100).toLong()
@@ -492,6 +491,7 @@ class AuthViewModel : ViewModel() {
 
     fun logout(context: Context) {
         hasPlayedSessionAd = false
+        FirebaseUserManager.syncPendingProgressToFirestore(context)
         FirebaseUserManager.clearSession(context)
         _currentUser.value = null
         _loginMobile.value = ""

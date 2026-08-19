@@ -161,17 +161,17 @@ fun GoogleCaptchaDialog(
                     .verticalScroll(androidx.compose.foundation.rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header (Google reCAPTCHA v3/v2 official look)
+                // Header (Neutral Security Verification look)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF4285F4), RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1976D2), RoundedCornerShape(12.dp))
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Google reCAPTCHA Monitored Verification",
+                            text = "সিকিউরিটি ভেরিফিকেশন (Security Check)",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.SemiBold
@@ -190,7 +190,7 @@ fun GoogleCaptchaDialog(
                     }
                     Icon(
                         imageVector = Icons.Default.Security,
-                        contentDescription = "Google Security",
+                        contentDescription = "Security Verification",
                         tint = Color.White,
                         modifier = Modifier.size(30.dp)
                     )
@@ -199,7 +199,7 @@ fun GoogleCaptchaDialog(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "গুগল হাই-ইভ্যালুয়েটেড সিকিউরিটি ক্যাপচার • লেভেল #$userLevel",
+                    text = "সিকিউরিটি টাস্ক সম্পন্ন করুন • লেভেল #$userLevel",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF374151),
@@ -292,12 +292,12 @@ fun GoogleCaptchaDialog(
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                     Icon(
                                         imageVector = Icons.Default.VerifiedUser,
-                                        contentDescription = "reCAPTCHA",
-                                        tint = Color(0xFF4285F4),
+                                        contentDescription = "Security Check",
+                                        tint = Color(0xFF1976D2),
                                         modifier = Modifier.size(28.dp)
                                     )
                                     Text(
-                                        text = "reCAPTCHA",
+                                        text = "Security Check",
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = Color.Gray
@@ -420,7 +420,7 @@ fun GoogleCaptchaDialog(
                                     modifier = Modifier.padding(vertical = 4.dp)
                                 ) {
                                     Text(
-                                        text = " Google Security: $mathA + $mathB = ? ",
+                                        text = " Security Challenge: $mathA + $mathB = ? ",
                                         color = Color(0xFFFFD700),
                                         fontSize = 19.sp,
                                         fontWeight = FontWeight.ExtraBold,
@@ -696,13 +696,13 @@ fun SpinBarDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "গুগল ক্যাপচার সফল! ✅",
+                                text = "ভেরিফিকেশন সফল! ✅",
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "🎰 স্পিন বার বোনাস ড্র (লেভেল #$userLevel)",
+                                text = "🎰 লাকি স্পিন বোনাস ড্র (লেভেল #$userLevel)",
                                 color = Color(0xFFFFD700),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.ExtraBold
