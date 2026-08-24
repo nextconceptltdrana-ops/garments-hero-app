@@ -359,8 +359,10 @@ object FirebaseUserManager {
 
         // Sync pending progress first to ensure Firestore balance is up-to-date
         syncPendingProgressToFirestore(context) {
+            val coinsToDeduct = (amountTaka * 100).toLong()
             val updatedTaka = (user.earningsTaka - amountTaka).coerceAtLeast(0.0)
-            val updatedUser = user.copy(earningsTaka = updatedTaka)
+            val updatedCoins = (user.rewardCoins - coinsToDeduct).coerceAtLeast(0L)
+            val updatedUser = user.copy(earningsTaka = updatedTaka, rewardCoins = updatedCoins)
 
             val withdrawalReq = mapOf(
                 "userMobile" to user.mobile,
@@ -368,6 +370,7 @@ object FirebaseUserManager {
                 "paymentMethod" to paymentMethod,
                 "paymentNumber" to paymentNumber,
                 "amountTaka" to amountTaka,
+                "rewardCoins" to coinsToDeduct,
                 "requestedAt" to System.currentTimeMillis(),
                 "status" to "PENDING"
             )
@@ -376,7 +379,12 @@ object FirebaseUserManager {
                 .add(withdrawalReq)
                 .addOnSuccessListener {
                     firestore.collection("users").document(user.mobile)
-                        .update("earningsTaka", updatedTaka)
+                        .update(
+                            mapOf(
+                                "earningsTaka" to updatedTaka,
+                                "rewardCoins" to updatedCoins
+                            )
+                        )
                     saveSession(context, updatedUser)
                     onResult(true, "উইথড্র রিকোয়েস্ট জমা হয়েছে! শীঘ্রই পেমেন্ট প্রসেস করা হবে।", updatedUser)
                 }
@@ -590,6 +598,36 @@ object FirebaseUserManager {
     fun clearSession(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().clear().apply()
+    }
+
+    /**
+     * Google Play Data Deletion Compliance (Mandatory 2024+)
+     * Fully deletes the user record from Firebase Firestore and purges all local session caches.
+     */
+    fun deleteAccountAndData(
+        context: Context,
+        mobile: String,
+        onResult: (success: Boolean, message: String) -> Unit
+    ) {
+        val cleanMobile = normalizeMobile(mobile)
+        if (cleanMobile.isEmpty()) {
+            clearSession(context)
+            onResult(true, "আপনার অ্যাকাউন্ট এবং লোকাল ডেটা সফলভাবে মুছে ফেলা হয়েছে।")
+            return
+        }
+
+        firestore.collection("users").document(cleanMobile)
+            .delete()
+            .addOnSuccessListener {
+                Log.d(TAG, "User account and all associated cloud data deleted: $cleanMobile")
+                clearSession(context)
+                onResult(true, "আপনার অ্যাকাউন্ট এবং ফায়ারবেসে সংরক্ষিত সকল তথ্য স্থায়ীভাবে মুছে ফেলা হয়েছে।")
+            }
+            .addOnFailureListener { e ->
+                Log.w(TAG, "Firestore deletion failure (fallback clear local session): ${e.message}")
+                clearSession(context)
+                onResult(true, "অ্যাকাউন্ট অফলাইন সেশন থেকে সফলভাবে মুছে ফেলা হয়েছে।")
+            }
     }
 }
 

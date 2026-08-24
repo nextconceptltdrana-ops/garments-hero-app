@@ -52,6 +52,19 @@ class AuthViewModel : ViewModel() {
     private val _isAdminMode = MutableStateFlow(false)
     val isAdminMode: StateFlow<Boolean> = _isAdminMode.asStateFlow()
 
+    // Google Play & AdMob Policy Compliance Dialog States
+    private val _showPrivacyPolicyDialog = MutableStateFlow(false)
+    val showPrivacyPolicyDialog: StateFlow<Boolean> = _showPrivacyPolicyDialog.asStateFlow()
+
+    private val _showDeleteAccountDialog = MutableStateFlow(false)
+    val showDeleteAccountDialog: StateFlow<Boolean> = _showDeleteAccountDialog.asStateFlow()
+
+    private val _showFairPlayDialog = MutableStateFlow(false)
+    val showFairPlayDialog: StateFlow<Boolean> = _showFairPlayDialog.asStateFlow()
+
+    private val _isDeletingAccount = MutableStateFlow(false)
+    val isDeletingAccount: StateFlow<Boolean> = _isDeletingAccount.asStateFlow()
+
     // Robust State Machine for Quiz Flow
     // Sequence: Start -> Ad1 -> Ad2 -> Captcha -> Ad3 -> Ad4 -> Spin -> Ad5 -> Ad6 -> Level Update
     sealed class QuizFlowState {
@@ -509,6 +522,48 @@ class AuthViewModel : ViewModel() {
 
     fun clearWithdrawMessage() {
         _withdrawStatusMessage.value = null
+    }
+
+    // Google Play Policy Handlers
+    fun openPrivacyPolicy() {
+        _showPrivacyPolicyDialog.value = true
+    }
+
+    fun dismissPrivacyPolicy() {
+        _showPrivacyPolicyDialog.value = false
+    }
+
+    fun openDeleteAccountDialog() {
+        _showDeleteAccountDialog.value = true
+    }
+
+    fun dismissDeleteAccountDialog() {
+        _showDeleteAccountDialog.value = false
+    }
+
+    fun openFairPlayDialog() {
+        _showFairPlayDialog.value = true
+    }
+
+    fun dismissFairPlayDialog() {
+        _showFairPlayDialog.value = false
+    }
+
+    fun deleteAccount(context: Context) {
+        val user = _currentUser.value ?: return
+        _isDeletingAccount.value = true
+        FirebaseUserManager.deleteAccountAndData(context, user.mobile) { success, message ->
+            _isDeletingAccount.value = false
+            _showDeleteAccountDialog.value = false
+            _currentUser.value = null
+            _loginMobile.value = ""
+            _registerName.value = ""
+            _registerMobile.value = ""
+            _registerReferral.value = ""
+            _selectedTabIndex.value = 0
+            _userMessage.value = message
+            _isSuccessMsg.value = success
+        }
     }
 }
 

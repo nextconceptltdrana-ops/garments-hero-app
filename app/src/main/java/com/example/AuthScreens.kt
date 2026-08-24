@@ -3,6 +3,8 @@ package com.example
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -38,6 +40,20 @@ import androidx.compose.ui.unit.sp
 import java.text.NumberFormat
 import java.util.*
 
+fun formatBanglaNumber(number: Any?): String {
+    val banglaDigits = charArrayOf('০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯')
+    val str = number?.toString() ?: "০"
+    val sb = StringBuilder()
+    for (ch in str) {
+        if (ch in '0'..'9') {
+            sb.append(banglaDigits[ch - '0'])
+        } else {
+            sb.append(ch)
+        }
+    }
+    return sb.toString()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAuthApp(viewModel: AuthViewModel) {
@@ -53,6 +69,11 @@ fun MainAuthApp(viewModel: AuthViewModel) {
 
     val isAdminMode by viewModel.isAdminMode.collectAsState()
     val showAdminPasswordDialog by viewModel.showAdminPasswordDialog.collectAsState()
+
+    val showPrivacyPolicyDialog by viewModel.showPrivacyPolicyDialog.collectAsState()
+    val showDeleteAccountDialog by viewModel.showDeleteAccountDialog.collectAsState()
+    val showFairPlayDialog by viewModel.showFairPlayDialog.collectAsState()
+    val isDeletingAccount by viewModel.isDeletingAccount.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.checkExistingSession(context)
@@ -72,12 +93,12 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                             }
                     ) {
                         Text(
-                            text = if (isAdminMode) "গার্মেন্টস হিরো এডমিন প্যানেল" else "গার্মেন্টস হিরো ইনকাম অ্যাপ",
+                            text = if (isAdminMode) "গার্মেন্টস হিরো এডমিন প্যানেল" else "গার্মেন্টস হিরো - গেম ও রিওয়ার্ডস",
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         )
                         Text(
-                            text = if (isAdminMode) "এডমিন এক্সেস মোড - সকল ব্যবহারকারী ও উইথড্র" else "ফায়ারবেস রিয়েলটাইম আর্নিং ও উইথড্র সিস্টেম",
+                            text = if (isAdminMode) "এডমিন এক্সেস মোড - সকল ব্যবহারকারী ও উইথড্র" else "ফায়ারবেস রিয়েলটাইম লেভেল ও রিওয়ার্ড সিস্টেম",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                         )
@@ -139,6 +160,26 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                 AdminPasswordDialog(
                     viewModel = viewModel,
                     onDismiss = { viewModel.dismissAdminPasswordDialog() }
+                )
+            }
+
+            if (showPrivacyPolicyDialog) {
+                PrivacyPolicyDialog(
+                    onDismiss = { viewModel.dismissPrivacyPolicy() }
+                )
+            }
+
+            if (showFairPlayDialog) {
+                FairPlayDialog(
+                    onDismiss = { viewModel.dismissFairPlayDialog() }
+                )
+            }
+
+            if (showDeleteAccountDialog) {
+                DeleteAccountDialog(
+                    isDeleting = isDeletingAccount,
+                    onConfirm = { viewModel.deleteAccount(context) },
+                    onDismiss = { viewModel.dismissDeleteAccountDialog() }
                 )
             }
 
@@ -284,6 +325,67 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                             isLoading = isLoading
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Google Play Compliance Links
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.openPrivacyPolicy() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = "Privacy Policy",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "প্রাইভেসি পলিসি",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Text(
+                            text = "•",
+                            color = Color.Gray,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { viewModel.openFairPlayDialog() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Gavel,
+                                contentDescription = "Fair Play Rules",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "ফেয়ার প্লে নিয়মাবলী",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -318,13 +420,13 @@ fun RegistrationCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "নতুন ইনকাম অ্যাকাউন্ট তৈরি করুন",
+                text = "নতুন প্লেয়ার অ্যাকাউন্ট তৈরি করুন",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "১ লক্ষ লেভেল খেলে প্রতিদিন টাকা আয় করার সুযোগ!",
+                text = "১ লক্ষ লেভেল খেলে রিওয়ার্ড পয়েন্ট ও মিশন বোনাস অর্জন করুন!",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -437,7 +539,7 @@ fun LoginCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "ইনকাম অ্যাকাউন্টে প্রবেশ করুন",
+                text = "প্লেয়ার অ্যাকাউন্টে প্রবেশ করুন",
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -600,6 +702,15 @@ fun UserIncomeDashboard(
         UserAccountDetailsCard(
             user = user,
             context = context,
+            onPrivacyPolicyClick = {
+                viewModel.openPrivacyPolicy()
+            },
+            onFairPlayClick = {
+                viewModel.openFairPlayDialog()
+            },
+            onDeleteAccountClick = {
+                viewModel.openDeleteAccountDialog()
+            },
             onLogout = {
                 if (!isFlowBusy) {
                     viewModel.logout(context)
@@ -965,12 +1076,12 @@ fun GoldenHeaderFrame(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Middle Row: Total Earnings & Reward Points
+            // Middle Row: Reward Coins & Level Milestone Score
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // Total Earnings Box
+                // Total Reward Coins Box
                 Surface(
                     color = Color(0xFF28253A),
                     shape = RoundedCornerShape(14.dp),
@@ -985,29 +1096,30 @@ fun GoldenHeaderFrame(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.Payments,
+                                imageVector = Icons.Default.MonetizationOn,
                                 contentDescription = null,
-                                tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size(18.dp)
+                                tint = Color(0xFFFFD700),
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "মোট ইনকাম",
-                                fontSize = 11.sp,
-                                color = Color.LightGray
+                                text = "রিওয়ার্ড পয়েন্ট",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFEEEEEE)
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF81C784)
+                            text = "${formatBanglaNumber(user.rewardCoins)} কয়েন",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFFFFD54F)
                         )
                     }
                 }
 
-                // Reward Points Box
+                // Completed Levels Box
                 Surface(
                     color = Color(0xFF28253A),
                     shape = RoundedCornerShape(14.dp),
@@ -1022,24 +1134,25 @@ fun GoldenHeaderFrame(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.MonetizationOn,
+                                imageVector = Icons.Default.MilitaryTech,
                                 contentDescription = null,
-                                tint = Color(0xFFFFD700),
-                                modifier = Modifier.size(18.dp)
+                                tint = Color(0xFF69F0AE),
+                                modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "রেওয়ার্ড পয়েন্ট",
-                                fontSize = 11.sp,
-                                color = Color.LightGray
+                                text = "লেভেল অর্জন",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFFEEEEEE)
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${formatBanglaNumber(user.rewardCoins)} কয়েন",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFFD700)
+                            text = "${formatBanglaNumber(user.completedLevels)} লেভেল",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color(0xFF69F0AE)
                         )
                     }
                 }
@@ -1205,13 +1318,13 @@ fun LevelPlayCard(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column(horizontalAlignment = Alignment.Start) {
                             Text(
-                                text = if (isFlowBusy) "বিজ্ঞাপন ও টাস্ক চলমান..." else "START EARNING MONEY 💰",
+                                text = if (isFlowBusy) "বিজ্ঞাপন ও টাস্ক চলমান..." else "START LEVEL MISSION 🎯",
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Black,
                                 color = if (isFlowBusy) Color.White else Color(0xFF211300)
                             )
                             Text(
-                                text = if (isFlowBusy) "অনুগ্রহ করে বিজ্ঞাপন বা টাস্ক সম্পন্ন করুন" else "লেভেল #${user.currentLevel} শুরু করুন (আয়: ২৫প + স্পিন বোনাস)",
+                                text = if (isFlowBusy) "অনুগ্রহ করে বিজ্ঞাপন বা টাস্ক সম্পন্ন করুন" else "লেভেল #${user.currentLevel} শুরু করুন (২৫ রিওয়ার্ড কয়েন + লাকি স্পিন)",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isFlowBusy) Color.LightGray else Color(0xFF4E342E)
@@ -1228,6 +1341,9 @@ fun LevelPlayCard(
 fun UserAccountDetailsCard(
     user: User,
     context: Context,
+    onPrivacyPolicyClick: () -> Unit,
+    onFairPlayClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit,
     onLogout: () -> Unit
 ) {
     Card(
@@ -1310,18 +1426,71 @@ fun UserAccountDetailsCard(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Google Play & Policy Navigation Buttons
+            Text(
+                text = "আইনি ও পলিসি সংক্রান্ত অপশন",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onPrivacyPolicyClick,
+                    modifier = Modifier.weight(1f).height(42.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Security, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "গোপনীয়তা নীতি", fontSize = 12.sp)
+                }
+
+                OutlinedButton(
+                    onClick = onFairPlayClick,
+                    modifier = Modifier.weight(1f).height(42.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Gavel, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "ফেয়ার প্লে নিয়ম", fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             OutlinedButton(
                 onClick = onLogout,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(46.dp),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
             ) {
                 Icon(imageVector = Icons.Default.Logout, contentDescription = "Logout")
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "লগ আউট করুন (Logout)", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                Text(text = "লগ আউট করুন (Logout)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Google Play Mandatory: Account Deletion Button
+            OutlinedButton(
+                onClick = onDeleteAccountClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f))
+            ) {
+                Icon(imageVector = Icons.Default.DeleteForever, contentDescription = "Delete Account", tint = MaterialTheme.colorScheme.error)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "অ্যাকাউন্ট ও ডেটা মুছুন (Delete Account)", fontSize = 13.sp, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -1342,6 +1511,9 @@ fun WithdrawDialog(
     val isWithdrawSuccess by viewModel.isWithdrawSuccess.collectAsState()
     val isWithdrawLoading by viewModel.isWithdrawLoading.collectAsState()
 
+    val enteredTaka = amountText.toDoubleOrNull() ?: 0.0
+    val requiredCoins = (enteredTaka * 100).toLong()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -1349,14 +1521,15 @@ fun WithdrawDialog(
                 Icon(
                     imageVector = Icons.Default.AccountBalanceWallet,
                     contentDescription = null,
-                    tint = Color(0xFF2E7D32),
-                    modifier = Modifier.size(28.dp)
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(30.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "টাকা উইথড্র করুন",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    text = "রিওয়ার্ড পয়েন্ট উইথড্র / রিডিম",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         },
@@ -1366,50 +1539,132 @@ fun WithdrawDialog(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
             ) {
-                Text(
-                    text = "বর্তমান ব্যালেন্স: ৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF2E7D32),
-                    fontSize = 15.sp
-                )
-                Text(
-                    text = "উইথড্র লিমিট: ৳১০০.০০ থেকে ৳৫০০.০০ (৩টি সফল রেফার আবশ্যক)",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFD32F2F)
-                )
+                // High-contrast Points and Taka conversion breakdown card
+                Surface(
+                    color = Color(0xFF1E1B2E),
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.5.dp, Color(0xFFFFD700)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "আপনার মোট পয়েন্ট",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFE0E0E0)
+                                )
+                                Text(
+                                    text = "${formatBanglaNumber(user.rewardCoins)} কয়েন",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFFFFD54F)
+                                )
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "টাকায় সমমূল্য মান",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFFE0E0E0)
+                                )
+                                Text(
+                                    text = "৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFF69F0AE)
+                                )
+                            }
+                        }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Divider(color = Color.White.copy(alpha = 0.25f), thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // High contrast Rate Calculation Badge
+                        Surface(
+                            color = Color(0xFF2E294A),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MonetizationOn,
+                                    contentDescription = null,
+                                    tint = Color(0xFFFFD700),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "হিসাব নিয়ম: ১০০ পয়েন্ট = ৳১.০০ (১ কয়েন = ০.০১ টাকা)",
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFF176)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // High contrast limit badge
+                Surface(
+                    color = Color(0xFFFFEBEE),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color(0xFFE53935)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "📌 উইথড্র লিমিট: ১০,০০০ পয়েন্ট (৳১০০) থেকে ৫০,০০০ পয়েন্ট (৳৫০০)",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFC62828),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Referral Requirement Status Box
                 Surface(
                     color = if (user.referralsCount >= 3) Color(0xFFE8F5E9) else Color(0xFFFFF3E0),
                     shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, if (user.referralsCount >= 3) Color(0xFF2E7D32) else Color(0xFFEF6C00)),
+                    border = BorderStroke(1.5.dp, if (user.referralsCount >= 3) Color(0xFF2E7D32) else Color(0xFFEF6C00)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(10.dp)) {
+                    Column(modifier = Modifier.padding(12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = if (user.referralsCount >= 3) Icons.Default.CheckCircle else Icons.Default.GroupAdd,
                                 contentDescription = null,
                                 tint = if (user.referralsCount >= 3) Color(0xFF2E7D32) else Color(0xFFE65100),
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(22.dp)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "রেফারেল শর্ত: ${user.referralsCount}/৩ টি সম্পন্ন",
                                 fontWeight = FontWeight.ExtraBold,
-                                fontSize = 13.sp,
-                                color = if (user.referralsCount >= 3) Color(0xFF2E7D32) else Color(0xFFE65100)
+                                fontSize = 14.sp,
+                                color = if (user.referralsCount >= 3) Color(0xFF1B5E20) else Color(0xFFBF360C)
                             )
                         }
                         if (user.referralsCount < 3) {
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "উইথড্র চালু করতে আপনাকে অবশ্যই ৩টি সফল রেফার সম্পন্ন করতে হবে (বাকি: ${3 - user.referralsCount}টি)। আপনার রেফার কোড: ${user.referralCode}",
-                                fontSize = 11.sp,
-                                color = Color(0xFFBF360C)
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFFBF360C),
+                                lineHeight = 16.sp
                             )
                         }
                     }
@@ -1422,14 +1677,16 @@ fun WithdrawDialog(
                     Surface(
                         color = if (isWithdrawSuccess) Color(0xFFE8F5E9) else Color(0xFFFFEBEE),
                         shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, if (isWithdrawSuccess) Color(0xFF4CAF50) else Color(0xFFE53935)),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 12.dp)
                     ) {
                         Text(
                             text = msg,
-                            color = if (isWithdrawSuccess) Color(0xFF2E7D32) else Color(0xFFC62828),
-                            fontSize = 13.sp,
+                            color = if (isWithdrawSuccess) Color(0xFF1B5E20) else Color(0xFFB71C1C),
+                            fontSize = 13.5.sp,
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(10.dp)
                         )
                     }
@@ -1437,8 +1694,9 @@ fun WithdrawDialog(
 
                 Text(
                     text = "পেমেন্ট মেথড নির্বাচন করুন:",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -1460,18 +1718,18 @@ fun WithdrawDialog(
                                 .clickable { selectedMethod = method }
                                 .border(
                                     width = if (isSelected) 2.5.dp else 1.dp,
-                                    color = if (isSelected) brandColor else Color.LightGray.copy(alpha = 0.5f),
+                                    color = if (isSelected) brandColor else Color.LightGray.copy(alpha = 0.6f),
                                     shape = RoundedCornerShape(14.dp)
                                 ),
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) brandColor.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface
+                                containerColor = if (isSelected) brandColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
                             ),
                             elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 4.dp else 1.dp)
                         ) {
                             Column(
                                 modifier = Modifier
-                                    .padding(vertical = 12.dp, horizontal = 4.dp)
+                                    .padding(vertical = 10.dp, horizontal = 4.dp)
                                     .fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
@@ -1480,15 +1738,15 @@ fun WithdrawDialog(
                                     painter = painterResource(id = logoRes),
                                     contentDescription = method,
                                     modifier = Modifier
-                                        .size(54.dp)
+                                        .size(52.dp)
                                         .clip(RoundedCornerShape(12.dp)),
                                     contentScale = ContentScale.Crop
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = method,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
                                     color = if (isSelected) brandColor else MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -1501,7 +1759,7 @@ fun WithdrawDialog(
                 OutlinedTextField(
                     value = accountNo,
                     onValueChange = { accountNo = it },
-                    label = { Text("$selectedMethod নম্বর") },
+                    label = { Text("$selectedMethod নম্বর", fontWeight = FontWeight.SemiBold) },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     modifier = Modifier.fillMaxWidth(),
@@ -1511,10 +1769,52 @@ fun WithdrawDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                // Fast select presets with bold high-contrast text
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf("100", "200", "500").forEach { preset ->
+                        val pTaka = preset.toDoubleOrNull() ?: 0.0
+                        val pCoins = (pTaka * 100).toLong()
+                        val isPresetSelected = amountText == preset
+                        OutlinedButton(
+                            onClick = { amountText = preset },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                            border = BorderStroke(
+                                width = if (isPresetSelected) 2.dp else 1.dp,
+                                color = if (isPresetSelected) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.5f)
+                            ),
+                            colors = if (isPresetSelected) ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else ButtonDefaults.outlinedButtonColors()
+                        ) {
+                            Text(
+                                text = "৳$preset\n(${formatBanglaNumber(pCoins)} কয়েন)",
+                                fontSize = 12.sp,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 15.sp,
+                                fontWeight = if (isPresetSelected) FontWeight.ExtraBold else FontWeight.Bold,
+                                color = if (isPresetSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { amountText = it },
-                    label = { Text("উইথড্র টাকার পরিমাণ (৳)") },
+                    label = { Text("উইথড্র টাকার পরিমাণ (৳)", fontWeight = FontWeight.SemiBold) },
+                    supportingText = {
+                        Text(
+                            text = "প্রয়োজনীয় পয়েন্ট: ${formatBanglaNumber(requiredCoins)} কয়েন (১০০ কয়েন = ৳১)",
+                            color = Color(0xFF2E7D32),
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
                     leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
@@ -2222,6 +2522,339 @@ fun AppBlockedScreen(
             }
         }
     }
+}
+
+/**
+ * Google Play Store Compliant Privacy Policy Dialog
+ */
+@Composable
+fun PrivacyPolicyDialog(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val privacyPolicyUrl = "https://docs.google.com/document/d/1Z-2AmNEi6WOQ7jeLUzRNWKs-fymoyru4WbQpQIvK4pg/edit?usp=sharing"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Security,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "গোপনীয়তা নীতি (Privacy Policy)",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "সর্বশেষ আপডেট: আগস্ট ২০২৬",
+                    fontSize = 12.sp,
+                    color = Color.Gray,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Online Google Doc Direct Access Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(privacyPolicyUrl))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "লিংক ওপেন করতে সমস্যা হয়েছে", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = "Open Web Policy",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "অফিশিয়াল অনলাইন পলিসি ডকুমেন্ট",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "গুগল ডকসে বিস্তারিত দেখতে ট্যাপ করুন",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "১. তথ্যের সংগ্রহ ও ব্যবহার (Information Collection):",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "আমরা আপনার নাম এবং মোবাইল নম্বর শুধুমাত্র অ্যাকাউন্ট সনাক্তকরণ, গেমের অগ্রগতি/লেভেল পয়েন্ট ক্লাউডে সংরক্ষণ এবং রিওয়ার্ড পে-আউট ভেরিফিকেশনের জন্য সংগ্রহ করি। আপনার সম্মতি ব্যতীত কোনো ব্যক্তিগত তথ্য তৃতীয় পক্ষের সাথে বিক্রি বা শেয়ার করা হয় না।",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "২. থার্ড-পার্টি সার্ভিস (Third-Party Services):",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "• Google Firebase Firestore: সুরক্ষিত ক্লাউড ডাটাবেজ হিসেবে ব্যবহৃত হয়।\n• Google AdMob: বিজ্ঞাপন প্রদর্শনের জন্য Google AdMob SDK ব্যবহৃত হয়। AdMob তাদের নিজস্ব গোপনীয়তা নীতি অনুযায়ী বিজ্ঞাপন পরিবেশন করে।",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "৩. অ্যাকাউন্ট ও ডাটা মুছে ফেলা (Data Deletion):",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "গুগল প্লে স্টোরের পলিসি অনুযায়ী, যেকোনো ব্যবহারকারী প্রোফাইল অপশনে গিয়ে 'অ্যাকাউন্ট ও ডেটা মুছুন' বাটনে ক্লিক করে সাথে সাথে তার সকল ক্লাউড ও লোকাল ডেটা স্থায়ীভাবে মুছে ফেলতে পারেন।",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "৪. যোগাযোগ ও অভিযোগ:",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = "যেকোনো জিজ্ঞাসা বা অভিযোগের জন্য আমাদের সাপোর্ট ইমেইলে যোগাযোগ করতে পারেন: support@garmentshero.app",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("সম্মত ও বন্ধ করুন (Agree & Close)")
+            }
+        }
+    )
+}
+
+/**
+ * Fair Play & Anti-Fraud / AdMob Traffic Protection Dialog
+ */
+@Composable
+fun FairPlayDialog(
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Gavel,
+                    contentDescription = null,
+                    tint = Color(0xFFE65100),
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "ফেয়ার প্লে ও অ্যান্টি-বট নিয়ম",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Google AdMob এর ইনভ্যালিড ট্রাফিক প্রতিরোধ ও স্বচ্ছতা নিশ্চিত করতে নিম্নের নিয়মগুলো মেনে চলুন:",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = "🚫 ১. ভিপিএন (VPN/Proxy) নিষিদ্ধ:",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFC62828)
+                )
+                Text(
+                    text = "ভিপিএন সংযোগ ব্যবহার করে বিজ্ঞাপন লোড করা সম্পূর্ণ নিষিদ্ধ। ভিপিএন শনাক্ত হলে অ্যাকাউন্ট সাময়িকভাবে স্থগিত হতে পারে।",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "🚫 ২. অটো-ক্লিকার বা বট স্ক্রিপ্ট নিষিদ্ধ:",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFC62828)
+                )
+                Text(
+                    text = "অটোমেটেড স্ক্রিপ্ট বা থার্ড-পার্টি ক্লিকার টুল ব্যবহার করে বিজ্ঞাপন বা লেভেল পূরণ করার চেষ্টা করলে স্বয়ংক্রিয়ভাবে অ্যাকাউন্ট ব্যান হবে।",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "✅ ৩. একটি ডিভাইসে একটি অ্যাকাউন্ট:",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF2E7D32)
+                )
+                Text(
+                    text = "ন্যায্য নিয়ম মেনে গেম খেলুন, লেভেল মিশন শেষ করে রিওয়ার্ড পয়েন্ট অর্জন করুন এবং উইথড্র অনুরোধ পাঠান।",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100))
+            ) {
+                Text("আমি বুঝতে পেরেছি (Understood)", color = Color.White)
+            }
+        }
+    )
+}
+
+/**
+ * Google Play 2024+ Mandatory: Account & Data Deletion Confirmation Dialog
+ */
+@Composable
+fun DeleteAccountDialog(
+    isDeleting: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = {
+            if (!isDeleting) onDismiss()
+        },
+        shape = RoundedCornerShape(20.dp),
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "অ্যাকাউন্ট ডিলিট নিশ্চিতকরণ",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "আপনি কি নিশ্চিত যে আপনার অ্যাকাউন্ট এবং ফায়ারবেসে থাকা সকল ডাটা (পয়েন্ট, লেভেল অগ্রগতি, রেফারেল রেকর্ড) স্থায়ীভাবে মুছে ফেলতে চান?",
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    lineHeight = 20.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "⚠️ সতর্কতা: একবার ডিলিট করার পর এই ডেটা আর কোনোভাবেই ফিরিয়ে আনা সম্ভব হবে না।",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.error,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isDeleting,
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("মুছে ফেলা হচ্ছে...", color = Color.White)
+                } else {
+                    Text("হ্যাঁ, স্থায়ীভাবে মুছুন (Delete)", color = Color.White)
+                }
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                enabled = !isDeleting,
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("বাতিল (Cancel)")
+            }
+        }
+    )
 }
 
 
