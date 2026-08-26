@@ -18,6 +18,8 @@ object FirebaseUserManager {
     private const val KEY_EARNINGS_TAKA = "user_earnings_taka"
     private const val KEY_REFERRALS_COUNT = "user_referrals_count"
     private const val KEY_AVATAR_URL = "user_avatar_url"
+    private const val KEY_LAST_CHECK_IN_DATE = "user_last_check_in_date"
+    private const val KEY_CHECK_IN_STREAK = "user_check_in_streak"
     private const val KEY_IS_LOGGED_IN = "is_logged_in"
     private const val KEY_UNSYNCED_EARNINGS = "unsynced_earnings_taka"
     private const val KEY_UNSYNCED_COINS = "unsynced_reward_coins"
@@ -199,7 +201,9 @@ object FirebaseUserManager {
                     completedLevels = (snapshot.getLong("completedLevels") ?: 0L).toInt(),
                     rewardCoins = snapshot.getLong("rewardCoins") ?: 0L,
                     earningsTaka = snapshot.getDouble("earningsTaka") ?: 0.0,
-                    avatarUrl = snapshot.getString("avatarUrl") ?: ""
+                    avatarUrl = snapshot.getString("avatarUrl") ?: "",
+                    lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
+                    checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt()
                 )
                 saveSession(context, user)
                 Log.d(TAG, "User logged in successfully from Firestore: $cleanMobile")
@@ -543,6 +547,100 @@ object FirebaseUserManager {
         }
     }
 
+    fun getBonusForStreak(dayStreak: Int): Pair<Double, Long> {
+        return when (dayStreak) {
+            1 -> Pair(0.20, 20L)
+            2 -> Pair(0.25, 25L)
+            3 -> Pair(0.30, 30L)
+            4 -> Pair(0.35, 35L)
+            5 -> Pair(0.40, 40L)
+            6 -> Pair(0.50, 50L)
+            else -> Pair(1.00, 100L) // Day 7 Mega Check-in Bonus
+        }
+    }
+
+    fun getRequiredAdsForStreak(dayStreak: Int): Int {
+        return when (dayStreak) {
+            1 -> 2 // 20 coins (৳0.20) -> 2 Full-screen Ads
+            2 -> 2 // 25 coins (৳0.25) -> 2 Full-screen Ads
+            3 -> 3 // 30 coins (৳0.30) -> 3 Full-screen Ads
+            4 -> 3 // 35 coins (৳0.35) -> 3 Full-screen Ads
+            5 -> 4 // 40 coins (৳0.40) -> 4 Full-screen Ads
+            6 -> 5 // 50 coins (৳0.50) -> 5 Full-screen Ads
+            else -> 8 // Day 7 (100 coins / ৳1.00) -> 8 Full-screen Ads
+        }
+    }
+
+    fun isEligibleForDailyCheckIn(user: User): Boolean {
+        val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())
+        return user.lastCheckInDate != todayStr
+    }
+
+    fun claimDailyCheckIn(
+        context: Context,
+        user: User,
+        onResult: (success: Boolean, message: String, updatedUser: User?, bonusTaka: Double, bonusCoins: Long, streak: Int) -> Unit
+    ) {
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val todayStr = dateFormat.format(java.util.Date())
+
+        if (user.lastCheckInDate == todayStr) {
+            onResult(false, "আপনি আজকের দৈনিক বোনাস ইতোমধ্যে সংগ্রহ করেছেন! আগামীকাল আবার আসুন।", user, 0.0, 0L, user.checkInStreak)
+            return
+        }
+
+        // Calculate yesterday date string
+        val yesterdayCalendar = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+        val yesterdayStr = dateFormat.format(yesterdayCalendar.time)
+
+        val newStreak = if (user.lastCheckInDate == yesterdayStr) {
+            if (user.checkInStreak >= 7) 1 else user.checkInStreak + 1
+        } else {
+            1
+        }
+
+        val (bonusTaka, bonusCoins) = getBonusForStreak(newStreak)
+        val updatedTaka = user.earningsTaka + bonusTaka
+        val updatedCoins = user.rewardCoins + bonusCoins
+
+        val updatedUser = user.copy(
+            earningsTaka = updatedTaka,
+            rewardCoins = updatedCoins,
+            lastCheckInDate = todayStr,
+            checkInStreak = newStreak
+        )
+
+        // Save immediately locally for instant responsiveness
+        saveSession(context, updatedUser)
+
+        val cleanMobile = normalizeMobile(user.mobile)
+        if (cleanMobile.isEmpty()) {
+            onResult(true, "🎉 অভিনন্দন! আপনি ডে-$newStreak এর দৈনিক বোনাস +$bonusCoins কয়েন (৳${String.format(java.util.Locale.US, "%.2f", bonusTaka)}) পেয়েছেন।", updatedUser, bonusTaka, bonusCoins, newStreak)
+            return
+        }
+
+        // Store directly in Firebase Firestore
+        val updates = mapOf(
+            "earningsTaka" to com.google.firebase.firestore.FieldValue.increment(bonusTaka),
+            "rewardCoins" to com.google.firebase.firestore.FieldValue.increment(bonusCoins),
+            "lastCheckInDate" to todayStr,
+            "checkInStreak" to newStreak
+        )
+
+        firestore.collection("users").document(cleanMobile)
+            .set(updates, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                Log.d(TAG, "Daily check-in synced to Firestore successfully for $cleanMobile (Streak: $newStreak, Bonus: ৳$bonusTaka, $bonusCoins Coins)")
+                onResult(true, "🎉 অভিনন্দন! আপনি ডে-$newStreak এর দৈনিক বোনাস +$bonusCoins কয়েন (৳${String.format(java.util.Locale.US, "%.2f", bonusTaka)}) পেয়েছেন।", updatedUser, bonusTaka, bonusCoins, newStreak)
+            }
+            .addOnFailureListener { e ->
+                Log.w(TAG, "Daily check-in Firestore write failed, buffered locally: ${e.message}")
+                onResult(true, "🎉 অভিনন্দন! আপনি ডে-$newStreak এর দৈনিক বোনাস +$bonusCoins কয়েন (৳${String.format(java.util.Locale.US, "%.2f", bonusTaka)}) পেয়েছেন।", updatedUser, bonusTaka, bonusCoins, newStreak)
+            }
+    }
+
     fun saveSession(context: Context, user: User) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit()
@@ -557,6 +655,8 @@ object FirebaseUserManager {
             .putFloat(KEY_EARNINGS_TAKA, user.earningsTaka.toFloat())
             .putInt(KEY_REFERRALS_COUNT, user.referralsCount)
             .putString(KEY_AVATAR_URL, user.avatarUrl)
+            .putString(KEY_LAST_CHECK_IN_DATE, user.lastCheckInDate)
+            .putInt(KEY_CHECK_IN_STREAK, user.checkInStreak)
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .apply()
     }
@@ -579,6 +679,8 @@ object FirebaseUserManager {
         val earningsTaka = prefs.getFloat(KEY_EARNINGS_TAKA, 0.0f).toDouble()
         val referralsCount = prefs.getInt(KEY_REFERRALS_COUNT, 0)
         val avatarUrl = prefs.getString(KEY_AVATAR_URL, "") ?: ""
+        val lastCheckInDate = prefs.getString(KEY_LAST_CHECK_IN_DATE, "") ?: ""
+        val checkInStreak = prefs.getInt(KEY_CHECK_IN_STREAK, 0)
 
         return User(
             name = name,
@@ -591,7 +693,9 @@ object FirebaseUserManager {
             rewardCoins = rewardCoins,
             earningsTaka = earningsTaka,
             referralsCount = referralsCount,
-            avatarUrl = avatarUrl
+            avatarUrl = avatarUrl,
+            lastCheckInDate = lastCheckInDate,
+            checkInStreak = checkInStreak
         )
     }
 

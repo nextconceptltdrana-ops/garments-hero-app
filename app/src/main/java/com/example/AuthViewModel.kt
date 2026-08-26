@@ -90,6 +90,9 @@ class AuthViewModel : ViewModel() {
     data class LevelCompletionData(
         val completedLevel: Int,
         val nextLevel: Int,
+        val coinsEarned: Long,
+        val totalCoins: Long,
+        val bonusCoins: Long,
         val takaEarned: Double,
         val totalBalance: Double,
         val bonusTaka: Double
@@ -419,7 +422,8 @@ class AuthViewModel : ViewModel() {
                         _adStatusMessage.value = "লেভেল ও পয়েন্ট যোগ হচ্ছে..."
 
                         val totalTakaEarned = 0.25 + pendingSpinBonusTaka
-                        val totalCoinsEarned = 25L + (pendingSpinBonusTaka * 100).toLong()
+                        val bonusCoins = (pendingSpinBonusTaka * 100).toLong()
+                        val totalCoinsEarned = 25L + bonusCoins
                         val previousLevel = _currentUser.value?.currentLevel ?: 1
 
                         completeCurrentLevel(
@@ -427,7 +431,7 @@ class AuthViewModel : ViewModel() {
                             takaEarned = totalTakaEarned,
                             coinsEarned = totalCoinsEarned
                         ) { updatedUser ->
-                            val resultMsg = "🎉 অভিনন্দন! লেভেল #$previousLevel সফলভাবে সম্পন্ন হয়েছে। ৳${String.format(java.util.Locale.US, "%.2f", totalTakaEarned)} (২৫প বেসিক + ৳${String.format(java.util.Locale.US, "%.2f", pendingSpinBonusTaka)} বোনাস) একাউন্টে যুক্ত হয়েছে।"
+                            val resultMsg = "🎉 অভিনন্দন! লেভেল #$previousLevel সফলভাবে সম্পন্ন হয়েছে। +$totalCoinsEarned রিওয়ার্ড পয়েন্ট ($totalCoinsEarned কয়েন) একাউন্টে যোগ হয়েছে।"
                             _quizFlowState.value = QuizFlowState.Completed(resultMsg)
                             _adStatusMessage.value = resultMsg
                             _isFlowBusy.value = false
@@ -436,6 +440,9 @@ class AuthViewModel : ViewModel() {
                             _levelCompletionData.value = LevelCompletionData(
                                 completedLevel = previousLevel,
                                 nextLevel = updatedUser.currentLevel,
+                                coinsEarned = totalCoinsEarned,
+                                totalCoins = updatedUser.rewardCoins,
+                                bonusCoins = bonusCoins,
                                 takaEarned = totalTakaEarned,
                                 totalBalance = updatedUser.earningsTaka,
                                 bonusTaka = pendingSpinBonusTaka
@@ -551,6 +558,146 @@ class AuthViewModel : ViewModel() {
     // Google Play Policy Handlers
     fun openPrivacyPolicy() {
         _showPrivacyPolicyDialog.value = true
+    }
+
+    data class CheckInResultData(
+        val bonusTaka: Double,
+        val bonusCoins: Long,
+        val streak: Int,
+        val message: String
+    )
+
+    private val _checkInResultData = MutableStateFlow<CheckInResultData?>(null)
+    val checkInResultData: StateFlow<CheckInResultData?> = _checkInResultData.asStateFlow()
+
+    private val _isClaimingCheckIn = MutableStateFlow(false)
+    val isClaimingCheckIn: StateFlow<Boolean> = _isClaimingCheckIn.asStateFlow()
+
+    private val _checkInAdProgress = MutableStateFlow<Pair<Int, Int>?>(null) // (currentAd, totalAds)
+    val checkInAdProgress: StateFlow<Pair<Int, Int>?> = _checkInAdProgress.asStateFlow()
+
+    fun claimDailyCheckInWithAds(activity: android.app.Activity) {
+        val user = _currentUser.value ?: return
+        if (_isClaimingCheckIn.value || _isFlowBusy.value) return
+
+        if (!FirebaseUserManager.isEligibleForDailyCheckIn(user)) {
+            _userMessage.value = "আপনি আজকের দৈনিক বোনাস ইতোমধ্যে সংগ্রহ করেছেন! আগামীকাল আবার আসুন।"
+            _isSuccessMsg.value = false
+            return
+        }
+
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val yesterdayCalendar = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+        val yesterdayStr = dateFormat.format(yesterdayCalendar.time)
+
+        val nextStreak = if (user.lastCheckInDate == yesterdayStr) {
+            if (user.checkInStreak >= 7) 1 else user.checkInStreak + 1
+        } else {
+            1
+        }
+
+        val (bonusTaka, bonusCoins) = FirebaseUserManager.getBonusForStreak(nextStreak)
+        val totalRequiredAds = FirebaseUserManager.getRequiredAdsForStreak(nextStreak)
+
+        _isClaimingCheckIn.value = true
+        _isFlowBusy.value = true
+        _checkInAdProgress.value = Pair(1, totalRequiredAds)
+        _adStatusMessage.value = "দৈনিক বোনাস সংগ্রহ: ফুলস্ক্রিন অ্যাড ১/$totalRequiredAds..."
+
+        playCheckInAdSequence(
+            activity = activity,
+            currentAd = 1,
+            totalAds = totalRequiredAds,
+            nextStreak = nextStreak,
+            bonusTaka = bonusTaka,
+            bonusCoins = bonusCoins
+        )
+    }
+
+    private fun playCheckInAdSequence(
+        activity: android.app.Activity,
+        currentAd: Int,
+        totalAds: Int,
+        nextStreak: Int,
+        bonusTaka: Double,
+        bonusCoins: Long
+    ) {
+        _checkInAdProgress.value = Pair(currentAd, totalAds)
+        val adTitle = "বোনাস অ্যাড $currentAd/$totalAds"
+
+        playAd(activity, adTitle, currentAd) {
+            if (currentAd < totalAds) {
+                playCheckInAdSequence(
+                    activity = activity,
+                    currentAd = currentAd + 1,
+                    totalAds = totalAds,
+                    nextStreak = nextStreak,
+                    bonusTaka = bonusTaka,
+                    bonusCoins = bonusCoins
+                )
+            } else {
+                // All proportional full-screen ads completed! Grant reward in Firestore
+                _adStatusMessage.value = "বোনাস ও কয়েন একাউন্টে যোগ হচ্ছে..."
+                _checkInAdProgress.value = null
+
+                val user = _currentUser.value ?: run {
+                    _isClaimingCheckIn.value = false
+                    _isFlowBusy.value = false
+                    return@playAd
+                }
+
+                FirebaseUserManager.claimDailyCheckIn(activity.applicationContext, user) { success, message, updatedUser, bTaka, bCoins, streak ->
+                    _isClaimingCheckIn.value = false
+                    _isFlowBusy.value = false
+                    if (success && updatedUser != null) {
+                        _currentUser.value = updatedUser
+                        _checkInResultData.value = CheckInResultData(
+                            bonusTaka = bTaka,
+                            bonusCoins = bCoins,
+                            streak = streak,
+                            message = message
+                        )
+                    } else {
+                        _userMessage.value = message
+                        _isSuccessMsg.value = false
+                    }
+                }
+            }
+        }
+    }
+
+    // Backwards compatible method
+    fun claimDailyCheckIn(context: Context) {
+        val activity = findActivity(context)
+        if (activity != null) {
+            claimDailyCheckInWithAds(activity)
+        } else {
+            val user = _currentUser.value ?: return
+            if (_isClaimingCheckIn.value) return
+            _isClaimingCheckIn.value = true
+
+            FirebaseUserManager.claimDailyCheckIn(context, user) { success, message, updatedUser, bonusTaka, bonusCoins, streak ->
+                _isClaimingCheckIn.value = false
+                if (success && updatedUser != null) {
+                    _currentUser.value = updatedUser
+                    _checkInResultData.value = CheckInResultData(
+                        bonusTaka = bonusTaka,
+                        bonusCoins = bonusCoins,
+                        streak = streak,
+                        message = message
+                    )
+                } else {
+                    _userMessage.value = message
+                    _isSuccessMsg.value = false
+                }
+            }
+        }
+    }
+
+    fun dismissCheckInDialog() {
+        _checkInResultData.value = null
     }
 
     fun dismissPrivacyPolicy() {

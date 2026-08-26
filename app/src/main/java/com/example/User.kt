@@ -14,7 +14,9 @@ data class User(
     val rewardCoins: Long = 0,
     val earningsTaka: Double = 0.0,
     val referralsCount: Int = 0,
-    val avatarUrl: String = ""
+    val avatarUrl: String = "",
+    val lastCheckInDate: String = "",
+    val checkInStreak: Int = 0
 ) {
     companion object {
         const val TOTAL_LEVELS = 100000 // ১ লক্ষ লেভেল

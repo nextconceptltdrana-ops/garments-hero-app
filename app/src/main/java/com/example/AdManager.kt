@@ -355,123 +355,125 @@ fun AdMobBannerView(modifier: Modifier = Modifier) {
         border = BorderStroke(1.5.dp, Color(0xFFFFD700)),
         shadowElevation = 6.dp
     ) {
-        if (!isAdMobLoaded && (AdManager.isEmulatorCheck() || !AdManager.isGmsActive())) {
-            val ad = sampleAds[currentAdIndex]
-            Row(
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Live AdMob Banner View
+            AndroidView(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
-                    .background(
-                        Brush.horizontalGradient(ad.bgGradient)
-                    )
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Ad Icon + Brand & Tagline
+                    .height(60.dp),
+                factory = { context ->
+                    val adView = AdView(context)
+                    adView.setAdSize(AdSize.BANNER)
+                    adView.adUnitId = AdManager.BANNER_AD_ID
+                    adView.adListener = object : com.google.android.gms.ads.AdListener() {
+                        override fun onAdLoaded() {
+                            isAdMobLoaded = true
+                            Log.d("AdManager", "AdMob Banner loaded successfully")
+                        }
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            Log.w("AdManager", "AdMob Banner load error: ${error.message} code: ${error.code}")
+                            isAdMobLoaded = false
+                        }
+                    }
+                    try {
+                        adView.loadAd(AdManager.createHighEcpmAdRequest())
+                    } catch (e: Throwable) {
+                        Log.w("AdManager", "AdView banner load exception: ${e.message}")
+                        isAdMobLoaded = false
+                    }
+                    adView
+                }
+            )
+
+            // Dynamic High-converting Sponsored Ad if AdMob is still loading, test-mode or no-fill
+            if (!isAdMobLoaded) {
+                val ad = sampleAds[currentAdIndex]
                 Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(ad.bgGradient)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Emoji / Brand Icon Container
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.4f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.size(40.dp)
+                    // Ad Icon + Brand & Tagline
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(text = ad.iconEmoji, fontSize = 22.sp)
+                        // Emoji / Brand Icon Container
+                        Surface(
+                            color = Color.Black.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(text = ad.iconEmoji, fontSize = 22.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    color = Color(0xFFFFD700),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = ad.badge,
+                                        color = Color(0xFF0F172A),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = ad.brand,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = ad.tagline,
+                                color = Color(0xFFF1F5F9),
+                                fontSize = 10.5.sp,
+                                fontWeight = FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
                         }
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(
-                                color = Color(0xFFFFD700),
-                                shape = RoundedCornerShape(4.dp)
-                            ) {
-                                Text(
-                                    text = ad.badge,
-                                    color = Color(0xFF0F172A),
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Black,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = ad.brand,
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(2.dp))
+                    // Call To Action Button
+                    Surface(
+                        color = ad.btnColor,
+                        shape = RoundedCornerShape(8.dp),
+                        shadowElevation = 2.dp
+                    ) {
                         Text(
-                            text = ad.tagline,
-                            color = Color(0xFFF1F5F9),
-                            fontSize = 10.5.sp,
-                            fontWeight = FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            text = ad.actionText,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                // Call To Action Button
-                Surface(
-                    color = ad.btnColor,
-                    shape = RoundedCornerShape(8.dp),
-                    shadowElevation = 2.dp
-                ) {
-                    Text(
-                        text = ad.actionText,
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                    )
-                }
-            }
-        } else {
-            // Live Android AdMob View with fallback listener
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(60.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                AndroidView(
-                    modifier = Modifier.fillMaxWidth(),
-                    factory = { context ->
-                        val adView = AdView(context)
-                        adView.setAdSize(AdSize.BANNER)
-                        adView.adUnitId = AdManager.BANNER_AD_ID
-                        adView.adListener = object : com.google.android.gms.ads.AdListener() {
-                            override fun onAdLoaded() {
-                                isAdMobLoaded = true
-                                Log.d("AdManager", "AdMob Banner loaded successfully")
-                            }
-                            override fun onAdFailedToLoad(error: LoadAdError) {
-                                Log.w("AdManager", "AdMob Banner load error: ${error.message} code: ${error.code}")
-                                isAdMobLoaded = false
-                            }
-                        }
-                        try {
-                            adView.loadAd(AdManager.createHighEcpmAdRequest())
-                        } catch (e: Throwable) {
-                            Log.w("AdManager", "AdView banner load exception: ${e.message}")
-                            isAdMobLoaded = false
-                        }
-                        adView
-                    }
-                )
             }
         }
     }

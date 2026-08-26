@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -623,6 +624,8 @@ fun UserIncomeDashboard(
     val isFlowBusy by viewModel.isFlowBusy.collectAsState()
     val quizFlowState by viewModel.quizFlowState.collectAsState()
     val levelCompletionData by viewModel.levelCompletionData.collectAsState()
+    val checkInResultData by viewModel.checkInResultData.collectAsState()
+    val isClaimingCheckIn by viewModel.isClaimingCheckIn.collectAsState()
 
     Column(
         modifier = Modifier
@@ -675,6 +678,26 @@ fun UserIncomeDashboard(
             onWithdrawClick = {
                 if (!isFlowBusy) {
                     viewModel.setWithdrawDialogVisible(true)
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // DAILY CHECK-IN REWARD BONUS CARD
+        val checkInAdProgress by viewModel.checkInAdProgress.collectAsState()
+        DailyCheckInCard(
+            user = user,
+            isClaiming = isClaimingCheckIn,
+            adProgress = checkInAdProgress,
+            onClaimCheckIn = {
+                if (!isFlowBusy) {
+                    val activity = context as? android.app.Activity
+                    if (activity != null) {
+                        viewModel.claimDailyCheckInWithAds(activity)
+                    } else {
+                        viewModel.claimDailyCheckIn(context)
+                    }
                 }
             }
         )
@@ -765,6 +788,15 @@ fun UserIncomeDashboard(
             }
         )
     }
+
+    if (checkInResultData != null) {
+        DailyCheckInCelebrationDialog(
+            data = checkInResultData!!,
+            onDismiss = {
+                viewModel.dismissCheckInDialog()
+            }
+        )
+    }
 }
 
 @Composable
@@ -837,24 +869,24 @@ fun LevelCompletionNextDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("💰 এই লেভেলে আয়:", color = Color.LightGray, fontSize = 13.sp)
+                            Text("⭐ এই লেভেলে অর্জিত রিওয়ার্ড:", color = Color.LightGray, fontSize = 13.sp)
                             Text(
-                                text = "+ ৳${String.format(Locale.US, "%.2f", data.takaEarned)}",
+                                text = "+ ${data.coinsEarned} কয়েন",
                                 color = Color(0xFF4ADE80),
                                 fontWeight = FontWeight.ExtraBold,
                                 fontSize = 15.sp
                             )
                         }
 
-                        if (data.bonusTaka > 0) {
+                        if (data.bonusCoins > 0) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("🎁 স্পিন বোনাস:", color = Color(0xFFE0E7FF), fontSize = 12.sp)
+                                Text("🎁 লাকি স্পিন বোনাস:", color = Color(0xFFE0E7FF), fontSize = 12.sp)
                                 Text(
-                                    text = "+ ৳${String.format(Locale.US, "%.2f", data.bonusTaka)}",
+                                    text = "+ ${data.bonusCoins} কয়েন",
                                     color = Color(0xFFFFD700),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp
@@ -869,13 +901,21 @@ fun LevelCompletionNextDialog(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("💼 আপনার মোট ব্যালেন্স:", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text(
-                                text = "৳${String.format(Locale.US, "%.2f", data.totalBalance)}",
-                                color = Color(0xFFFFD700),
-                                fontWeight = FontWeight.Black,
-                                fontSize = 16.sp
-                            )
+                            Text("💼 আপনার মোট রিওয়ার্ড কয়েন:", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "${data.totalCoins} কয়েন",
+                                    color = Color(0xFFFFD700),
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = "(সমমূল্য ৳${String.format(Locale.US, "%.2f", data.totalBalance)})",
+                                    color = Color(0xFF81C784),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
@@ -2852,6 +2892,424 @@ fun DeleteAccountDialog(
                 shape = RoundedCornerShape(10.dp)
             ) {
                 Text("বাতিল (Cancel)")
+            }
+        }
+    )
+}
+
+@Composable
+fun DailyCheckInCard(
+    user: User,
+    isClaiming: Boolean,
+    adProgress: Pair<Int, Int>? = null,
+    onClaimCheckIn: () -> Unit
+) {
+    val isEligible = FirebaseUserManager.isEligibleForDailyCheckIn(user)
+    val streak = user.checkInStreak
+    val activeDay = if (isEligible) {
+        val yesterdayCalendar = java.util.Calendar.getInstance().apply {
+            add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+        val yesterdayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(yesterdayCalendar.time)
+        if (user.lastCheckInDate == yesterdayStr) {
+            if (streak >= 7) 1 else streak + 1
+        } else {
+            1
+        }
+    } else {
+        if (streak in 1..7) streak else 1
+    }
+
+    val daysRewards = listOf(
+        Triple(1, 0.20, 20L),
+        Triple(2, 0.25, 25L),
+        Triple(3, 0.30, 30L),
+        Triple(4, 0.35, 35L),
+        Triple(5, 0.40, 40L),
+        Triple(6, 0.50, 50L),
+        Triple(7, 1.00, 100L)
+    )
+
+    val goldGradient = Brush.horizontalGradient(
+        listOf(Color(0xFFFFD700), Color(0xFFFFA000), Color(0xFFFFD700))
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                BorderStroke(2.dp, goldGradient),
+                shape = RoundedCornerShape(20.dp)
+            ),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF1E1C30)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFD700).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "📅", fontSize = 20.sp)
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "দৈনিক চেক-ইন রিওয়ার্ড",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "রিওয়ার্ড অনুপাতে ফুলস্ক্রিন অ্যাড দেখুন",
+                            fontSize = 11.5.sp,
+                            color = Color(0xFFFFD700),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                // Streak Badge
+                Surface(
+                    color = Color(0xFF2E2A48),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.6f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "🔥", fontSize = 14.sp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "স্ট্রিক: ${if (isEligible && activeDay == 1 && streak > 0) 0 else streak} দিন",
+                            color = Color(0xFFFFD700),
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 7-day horizontal scroll of day cards
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                daysRewards.forEach { (day, taka, coins) ->
+                    val isClaimed = if (isEligible) {
+                        day < activeDay
+                    } else {
+                        day <= streak
+                    }
+                    val isCurrentDay = (day == activeDay) && isEligible
+                    val requiredAds = FirebaseUserManager.getRequiredAdsForStreak(day)
+
+                    val itemBorder = when {
+                        isCurrentDay -> BorderStroke(2.dp, Color(0xFFFFD700))
+                        isClaimed -> BorderStroke(1.dp, Color(0xFF4ADE80))
+                        else -> BorderStroke(1.dp, Color(0xFF3B3856))
+                    }
+
+                    val itemBg = when {
+                        isCurrentDay -> Color(0xFF332B52)
+                        isClaimed -> Color(0xFF1E3A2B)
+                        else -> Color(0xFF26233B)
+                    }
+
+                    Surface(
+                        modifier = Modifier
+                            .width(80.dp)
+                            .clip(RoundedCornerShape(14.dp)),
+                        shape = RoundedCornerShape(14.dp),
+                        color = itemBg,
+                        border = itemBorder
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "দিন $day",
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isCurrentDay) Color(0xFFFFD700) else Color.White
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = if (day == 7) "🎁" else if (isClaimed) "✅" else "🪙",
+                                fontSize = 20.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = "+$coins",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (isClaimed) Color(0xFF4ADE80) else Color(0xFFFFD700)
+                            )
+                            Text(
+                                text = "৳${String.format(Locale.US, "%.2f", taka)}",
+                                fontSize = 10.sp,
+                                color = Color.LightGray
+                            )
+
+                            Spacer(modifier = Modifier.height(3.dp))
+
+                            // Proportional Full-screen Ad indicator
+                            Surface(
+                                color = if (isClaimed) Color(0xFF2E7D32).copy(alpha = 0.6f) else Color(0xFF1F2937),
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(0.5.dp, if (isCurrentDay) Color(0xFFFFD700) else Color.Gray.copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = if (isClaimed) "দেখা শেষ" else "📺 $requiredAds অ্যাড",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isClaimed) Color(0xFF81C784) else if (isCurrentDay) Color(0xFFFFD700) else Color.LightGray,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                )
+                            }
+
+                            if (isCurrentDay) {
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Surface(
+                                    color = Color(0xFFFFD700),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "আজকের",
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFF1E1C30),
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Action Button
+            if (isEligible) {
+                val (_, nextTaka, nextCoins) = daysRewards.find { it.first == activeDay } ?: Triple(1, 0.20, 20L)
+                val totalReqAds = FirebaseUserManager.getRequiredAdsForStreak(activeDay)
+
+                Button(
+                    onClick = onClaimCheckIn,
+                    enabled = !isClaiming,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF9800),
+                        contentColor = Color.White
+                    ),
+                    border = BorderStroke(1.5.dp, Color(0xFFFFD700))
+                ) {
+                    if (isClaiming) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        val currentAd = adProgress?.first ?: 1
+                        val totalAds = adProgress?.second ?: totalReqAds
+                        Text(
+                            text = "📺 ফুলস্ক্রিন অ্যাড $currentAd/$totalAds চলছে...",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.5.sp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.CardGiftcard,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🎁 আজকের বোনাস সংগ্রহ করুন ($totalReqAds টি ফুলস্ক্রিন অ্যাড)",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 13.5.sp
+                        )
+                    }
+                }
+            } else {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFF1E3A2B),
+                    border = BorderStroke(1.dp, Color(0xFF4ADE80).copy(alpha = 0.6f))
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF4ADE80),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "✅ আজকের বোনাস সংগ্রহ সম্পন্ন (আগামীকাল আবার আসুন)",
+                            color = Color(0xFF4ADE80),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DailyCheckInCelebrationDialog(
+    data: AuthViewModel.CheckInResultData,
+    onDismiss: () -> Unit
+) {
+    val goldGradient = Brush.horizontalGradient(
+        listOf(Color(0xFFFFD700), Color(0xFFFFA500), Color(0xFFFFD700))
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Color(0xFF1E1C30),
+        title = null,
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Celebration Icon
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFFFFD700), Color(0xFFFFA000))
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "🎁", fontSize = 36.sp)
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "দৈনিক চেক-ইন সম্পন্ন!",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White
+                )
+
+                Text(
+                    text = "দিন #${data.streak} স্ট্রিক বোনাস সরাসরি আপনার ফায়ারবেস অ্যাকাউন্টে যোগ হয়েছে",
+                    fontSize = 12.5.sp,
+                    color = Color.LightGray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Reward Details Container
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(
+                            BorderStroke(1.5.dp, goldGradient),
+                            RoundedCornerShape(16.dp)
+                        ),
+                    color = Color(0xFF2A2744),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "+${data.bonusCoins} কয়েন",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFFFFD700)
+                        )
+                        Text(
+                            text = "(সমমূল্য ৳${String.format(Locale.US, "%.2f", data.bonusTaka)})",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF4ADE80)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "🔥 পরের বোনাস পেতে আগামীকাল আবার অ্যাপে প্রবেশ করুন!",
+                    fontSize = 12.sp,
+                    color = Color(0xFFFFD700),
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF00C853)
+                )
+            ) {
+                Text(
+                    text = "ধন্যবাদ / সম্পন্ন করুন ➔",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
             }
         }
     )
