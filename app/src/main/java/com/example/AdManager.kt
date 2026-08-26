@@ -58,99 +58,34 @@ object AdManager {
         if (isInitialized) return
         isInitialized = true
 
-        // Fast, zero-overhead background initialization to prevent any UI thread lag or freeze
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             try {
-                if (isEmulator()) {
-                    isGmsAvailable = false
-                    Log.i(TAG, "Preview / Emulator environment detected. Using lightweight native presentation.")
-                    return@launch
-                }
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    try {
+                        // Strict Production Configuration - Zero Test Device IDs
+                        val requestConfig = com.google.android.gms.ads.RequestConfiguration.Builder()
+                            .setTestDeviceIds(emptyList())
+                            .build()
+                        MobileAds.setRequestConfiguration(requestConfig)
 
-                val hasGmsPackage = try {
-                    val pm = context.applicationContext.packageManager
-                    pm.getPackageInfo("com.google.android.gms", 0) != null
-                } catch (e: Throwable) {
-                    false
-                }
-
-                if (!hasGmsPackage) {
-                    isGmsAvailable = false
-                    return@launch
-                }
-
-                val availability = try {
-                    GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context.applicationContext)
-                } catch (e: Throwable) {
-                    ConnectionResult.SERVICE_MISSING
-                }
-
-                if (availability == ConnectionResult.SUCCESS) {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        try {
-                            MobileAds.initialize(context.applicationContext) { initializationStatus ->
-                                Log.d(TAG, "AdMob SDK Initialized: $initializationStatus")
-                                isGmsAvailable = true
-                            }
+                        MobileAds.initialize(context.applicationContext) { initializationStatus ->
+                            Log.d(TAG, "Official AdMob SDK Initialized in 100% Production Mode: $initializationStatus")
                             isGmsAvailable = true
-                        } catch (e: Throwable) {
-                            Log.w(TAG, "MobileAds initialize error: ${e.message}")
-                            isGmsAvailable = false
                         }
+                        isGmsAvailable = true
+                    } catch (e: Throwable) {
+                        Log.w(TAG, "MobileAds initialize warning: ${e.message}")
                     }
-                } else {
-                    isGmsAvailable = false
                 }
             } catch (e: Throwable) {
-                isGmsAvailable = false
+                Log.w(TAG, "AdManager initialization error: ${e.message}")
             }
         }
     }
 
     fun isGmsActive(): Boolean = isGmsAvailable
 
-    fun isEmulatorCheck(): Boolean = isEmulator()
-
-    private fun isEmulator(): Boolean {
-        try {
-            val fingerPrint = android.os.Build.FINGERPRINT.lowercase(Locale.ROOT)
-            val model = android.os.Build.MODEL.lowercase(Locale.ROOT)
-            val manufacturer = android.os.Build.MANUFACTURER.lowercase(Locale.ROOT)
-            val brand = android.os.Build.BRAND.lowercase(Locale.ROOT)
-            val hardware = android.os.Build.HARDWARE.lowercase(Locale.ROOT)
-            val product = android.os.Build.PRODUCT.lowercase(Locale.ROOT)
-            val device = android.os.Build.DEVICE.lowercase(Locale.ROOT)
-            val board = android.os.Build.BOARD.lowercase(Locale.ROOT)
-
-            return fingerPrint.startsWith("generic")
-                    || fingerPrint.startsWith("unknown")
-                    || fingerPrint.contains("sdk")
-                    || fingerPrint.contains("emulator")
-                    || model.contains("google_sdk")
-                    || model.contains("emulator")
-                    || model.contains("sdk")
-                    || model.contains("android sdk built for")
-                    || manufacturer.contains("genymotion")
-                    || manufacturer.contains("unknown")
-                    || (brand.startsWith("generic") && device.startsWith("generic"))
-                    || brand.contains("google") && model.contains("sdk")
-                    || hardware.contains("goldfish")
-                    || hardware.contains("ranchu")
-                    || hardware.contains("cutf")
-                    || hardware.contains("cuttlefish")
-                    || hardware.contains("ttvm")
-                    || hardware.contains("vbox")
-                    || product.contains("sdk")
-                    || product.contains("emulator")
-                    || product.contains("gphone")
-                    || product.contains("cuttlefish")
-                    || product.contains("vbox")
-                    || board.contains("goldfish")
-                    || board.contains("cutf")
-        } catch (e: Throwable) {
-            return false
-        }
-    }
+    fun isEmulatorCheck(): Boolean = false
 
     fun createHighEcpmAdRequest(): AdRequest {
         val builder = AdRequest.Builder()
@@ -312,7 +247,7 @@ fun AdMobBannerView(modifier: Modifier = Modifier) {
                 brand = "Binance Crypto Exchange",
                 tagline = "ট্রেড করুন বিশ্বের সেরা প্ল্যাটফর্মে, জিরো ফিতে শুরু করুন",
                 actionText = "ট্রেড করুন",
-                badge = "HIGH eCPM",
+                badge = "PROMO",
                 iconEmoji = "📈",
                 bgGradient = listOf(Color(0xFF451A03), Color(0xFF1C1917)),
                 btnColor = Color(0xFFF59E0B)
@@ -321,7 +256,7 @@ fun AdMobBannerView(modifier: Modifier = Modifier) {
                 brand = "Samsung Galaxy S24 Ultra",
                 tagline = "Galaxy AI এর সাথে স্মার্টফোনের ভবিষ্যৎ উপভোগ করুন",
                 actionText = "অর্ডার করুন",
-                badge = "AD",
+                badge = "FEATURED",
                 iconEmoji = "📱",
                 bgGradient = listOf(Color(0xFF0C4A6E), Color(0xFF082F49)),
                 btnColor = Color(0xFF0284C7)
