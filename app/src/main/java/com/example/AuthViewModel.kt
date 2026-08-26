@@ -66,17 +66,23 @@ class AuthViewModel : ViewModel() {
     val isDeletingAccount: StateFlow<Boolean> = _isDeletingAccount.asStateFlow()
 
     // Robust State Machine for Quiz Flow
-    // Sequence: Start -> Ad1 -> Ad2 -> Captcha -> Ad3 -> Ad4 -> Spin -> Ad5 -> Ad6 -> Level Update
+    // Sequence: Start -> Ad1 -> Ad2 -> Ad3 -> Ad4 -> Captcha -> Ad5 -> Ad6 -> Ad7 -> Ad8 -> Spin -> Ad9 -> Ad10 -> Ad11 -> Ad12 -> Level Update
     sealed class QuizFlowState {
         object Idle : QuizFlowState()
         object Ad1 : QuizFlowState()
         object Ad2 : QuizFlowState()
-        object Captcha : QuizFlowState()
         object Ad3 : QuizFlowState()
         object Ad4 : QuizFlowState()
-        object Spin : QuizFlowState()
+        object Captcha : QuizFlowState()
         object Ad5 : QuizFlowState()
         object Ad6 : QuizFlowState()
+        object Ad7 : QuizFlowState()
+        object Ad8 : QuizFlowState()
+        object Spin : QuizFlowState()
+        object Ad9 : QuizFlowState()
+        object Ad10 : QuizFlowState()
+        object Ad11 : QuizFlowState()
+        object Ad12 : QuizFlowState()
         object LevelUpdate : QuizFlowState()
         data class Completed(val message: String) : QuizFlowState()
     }
@@ -107,7 +113,7 @@ class AuthViewModel : ViewModel() {
     private val _showAdOverlay = MutableStateFlow(false)
     val showAdOverlay: StateFlow<Boolean> = _showAdOverlay.asStateFlow()
 
-    private val _currentAdTitle = MutableStateFlow("অ্যাড ১/৬")
+    private val _currentAdTitle = MutableStateFlow("অ্যাড ১/১২")
     val currentAdTitle: StateFlow<String> = _currentAdTitle.asStateFlow()
 
     private val _currentAdIndex = MutableStateFlow(1)
@@ -350,18 +356,24 @@ class AuthViewModel : ViewModel() {
         callback?.invoke()
     }
 
-    // Sequence: Start -> Ad1 -> Ad2 -> Security Check -> Ad3 -> Ad4 -> Spin -> Ad5 -> Ad6 -> Level Update
+    // Sequence: Start -> Ad1 -> Ad2 -> Ad3 -> Ad4 -> Security Check -> Ad5 -> Ad6 -> Ad7 -> Ad8 -> Spin -> Ad9 -> Ad10 -> Ad11 -> Ad12 -> Level Update
     fun startQuizFlow(activity: android.app.Activity) {
         if (_isFlowBusy.value) return
         _isFlowBusy.value = true
         _quizFlowState.value = QuizFlowState.Ad1
 
-        playAd(activity, "অ্যাড ১/৬", 1) {
+        playAd(activity, "অ্যাড ১/১২", 1) {
             _quizFlowState.value = QuizFlowState.Ad2
-            playAd(activity, "অ্যাড ২/৬", 2) {
-                _quizFlowState.value = QuizFlowState.Captcha
-                _showCaptchaDialog.value = true
-                _adStatusMessage.value = "সিকিউরিটি ভেরিফিকেশন সম্পন্ন করুন..."
+            playAd(activity, "অ্যাড ২/১২", 2) {
+                _quizFlowState.value = QuizFlowState.Ad3
+                playAd(activity, "অ্যাড ৩/১২", 3) {
+                    _quizFlowState.value = QuizFlowState.Ad4
+                    playAd(activity, "অ্যাড ৪/১২", 4) {
+                        _quizFlowState.value = QuizFlowState.Captcha
+                        _showCaptchaDialog.value = true
+                        _adStatusMessage.value = "সিকিউরিটি ভেরিফিকেশন সম্পন্ন করুন..."
+                    }
+                }
             }
         }
     }
@@ -373,14 +385,20 @@ class AuthViewModel : ViewModel() {
 
     fun onCaptchaVerified(activity: android.app.Activity) {
         _showCaptchaDialog.value = false
-        _quizFlowState.value = QuizFlowState.Ad3
+        _quizFlowState.value = QuizFlowState.Ad5
 
-        playAd(activity, "অ্যাড ৩/৬", 3) {
-            _quizFlowState.value = QuizFlowState.Ad4
-            playAd(activity, "অ্যাড ৪/৬", 4) {
-                _quizFlowState.value = QuizFlowState.Spin
-                _showSpinBarDialog.value = true
-                _adStatusMessage.value = "লাকি স্পিন বার ঘুরিয়ে বোনাস জিতে নিন..."
+        playAd(activity, "অ্যাড ৫/১২", 5) {
+            _quizFlowState.value = QuizFlowState.Ad6
+            playAd(activity, "অ্যাড ৬/১২", 6) {
+                _quizFlowState.value = QuizFlowState.Ad7
+                playAd(activity, "অ্যাড ৭/১২", 7) {
+                    _quizFlowState.value = QuizFlowState.Ad8
+                    playAd(activity, "অ্যাড ৮/১২", 8) {
+                        _quizFlowState.value = QuizFlowState.Spin
+                        _showSpinBarDialog.value = true
+                        _adStatusMessage.value = "লাকি স্পিন বার ঘুরিয়ে বোনাস জিতে নিন..."
+                    }
+                }
             }
         }
     }
@@ -388,36 +406,42 @@ class AuthViewModel : ViewModel() {
     fun onSpinCompletedAndPlayFinalAds(activity: android.app.Activity, spinBonusTaka: Double) {
         _showSpinBarDialog.value = false
         pendingSpinBonusTaka = spinBonusTaka
-        _quizFlowState.value = QuizFlowState.Ad5
+        _quizFlowState.value = QuizFlowState.Ad9
 
-        playAd(activity, "অ্যাড ৫/৬", 5) {
-            _quizFlowState.value = QuizFlowState.Ad6
-            playAd(activity, "অ্যাড ৬/৬", 6) {
-                _quizFlowState.value = QuizFlowState.LevelUpdate
-                _adStatusMessage.value = "লেভেল ও পয়েন্ট যোগ হচ্ছে..."
+        playAd(activity, "অ্যাড ৯/১২", 9) {
+            _quizFlowState.value = QuizFlowState.Ad10
+            playAd(activity, "অ্যাড ১০/১২", 10) {
+                _quizFlowState.value = QuizFlowState.Ad11
+                playAd(activity, "অ্যাড ১১/১২", 11) {
+                    _quizFlowState.value = QuizFlowState.Ad12
+                    playAd(activity, "অ্যাড ১২/১২", 12) {
+                        _quizFlowState.value = QuizFlowState.LevelUpdate
+                        _adStatusMessage.value = "লেভেল ও পয়েন্ট যোগ হচ্ছে..."
 
-                val totalTakaEarned = 0.25 + pendingSpinBonusTaka
-                val totalCoinsEarned = 25L + (pendingSpinBonusTaka * 100).toLong()
-                val previousLevel = _currentUser.value?.currentLevel ?: 1
+                        val totalTakaEarned = 0.25 + pendingSpinBonusTaka
+                        val totalCoinsEarned = 25L + (pendingSpinBonusTaka * 100).toLong()
+                        val previousLevel = _currentUser.value?.currentLevel ?: 1
 
-                completeCurrentLevel(
-                    activity.applicationContext,
-                    takaEarned = totalTakaEarned,
-                    coinsEarned = totalCoinsEarned
-                ) { updatedUser ->
-                    val resultMsg = "🎉 অভিনন্দন! লেভেল #$previousLevel সফলভাবে সম্পন্ন হয়েছে। ৳${String.format(java.util.Locale.US, "%.2f", totalTakaEarned)} (২৫প বেসিক + ৳${String.format(java.util.Locale.US, "%.2f", pendingSpinBonusTaka)} বোনাস) একাউন্টে যুক্ত হয়েছে।"
-                    _quizFlowState.value = QuizFlowState.Completed(resultMsg)
-                    _adStatusMessage.value = resultMsg
-                    _isFlowBusy.value = false
+                        completeCurrentLevel(
+                            activity.applicationContext,
+                            takaEarned = totalTakaEarned,
+                            coinsEarned = totalCoinsEarned
+                        ) { updatedUser ->
+                            val resultMsg = "🎉 অভিনন্দন! লেভেল #$previousLevel সফলভাবে সম্পন্ন হয়েছে। ৳${String.format(java.util.Locale.US, "%.2f", totalTakaEarned)} (২৫প বেসিক + ৳${String.format(java.util.Locale.US, "%.2f", pendingSpinBonusTaka)} বোনাস) একাউন্টে যুক্ত হয়েছে।"
+                            _quizFlowState.value = QuizFlowState.Completed(resultMsg)
+                            _adStatusMessage.value = resultMsg
+                            _isFlowBusy.value = false
 
-                    // Show Next Level prompt for continuous targeted earning flow
-                    _levelCompletionData.value = LevelCompletionData(
-                        completedLevel = previousLevel,
-                        nextLevel = updatedUser.currentLevel,
-                        takaEarned = totalTakaEarned,
-                        totalBalance = updatedUser.earningsTaka,
-                        bonusTaka = pendingSpinBonusTaka
-                    )
+                            // Show Next Level prompt for continuous targeted earning flow
+                            _levelCompletionData.value = LevelCompletionData(
+                                completedLevel = previousLevel,
+                                nextLevel = updatedUser.currentLevel,
+                                takaEarned = totalTakaEarned,
+                                totalBalance = updatedUser.earningsTaka,
+                                bonusTaka = pendingSpinBonusTaka
+                            )
+                        }
+                    }
                 }
             }
         }
