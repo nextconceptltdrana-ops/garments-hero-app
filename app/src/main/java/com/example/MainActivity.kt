@@ -1,6 +1,7 @@
 package com.example
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,6 +16,8 @@ class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    // Keep screen on continuously during app usage and ad playback
+    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     try {
         AdManager.initialize(this)
         // Flush any pending unsynced points from previous session/crash

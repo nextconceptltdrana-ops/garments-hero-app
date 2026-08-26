@@ -176,6 +176,13 @@ object AdManager {
         onAdDismissed: () -> Unit
     ) {
         initialize(activity)
+        try {
+            activity.runOnUiThread {
+                activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        } catch (e: Throwable) {
+            // Ignore if already set
+        }
         Log.d(TAG, "Requesting and presenting standard Google AdMob Ad...")
 
         try {
