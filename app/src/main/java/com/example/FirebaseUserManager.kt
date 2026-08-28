@@ -549,25 +549,25 @@ object FirebaseUserManager {
 
     fun getBonusForStreak(dayStreak: Int): Pair<Double, Long> {
         return when (dayStreak) {
-            1 -> Pair(0.20, 20L)
-            2 -> Pair(0.25, 25L)
-            3 -> Pair(0.30, 30L)
-            4 -> Pair(0.35, 35L)
-            5 -> Pair(0.40, 40L)
-            6 -> Pair(0.50, 50L)
-            else -> Pair(1.00, 100L) // Day 7 Mega Check-in Bonus
+            1 -> Pair(0.03, 3L)
+            2 -> Pair(0.03, 3L)
+            3 -> Pair(0.04, 4L)
+            4 -> Pair(0.04, 4L)
+            5 -> Pair(0.05, 5L)
+            6 -> Pair(0.06, 6L)
+            else -> Pair(0.08, 8L) // Day 7 Mega Check-in Bonus (8 Coins = ৳0.08)
         }
     }
 
     fun getRequiredAdsForStreak(dayStreak: Int): Int {
         return when (dayStreak) {
-            1 -> 2 // 20 coins (৳0.20) -> 2 Full-screen Ads
-            2 -> 2 // 25 coins (৳0.25) -> 2 Full-screen Ads
-            3 -> 3 // 30 coins (৳0.30) -> 3 Full-screen Ads
-            4 -> 3 // 35 coins (৳0.35) -> 3 Full-screen Ads
-            5 -> 4 // 40 coins (৳0.40) -> 4 Full-screen Ads
-            6 -> 5 // 50 coins (৳0.50) -> 5 Full-screen Ads
-            else -> 8 // Day 7 (100 coins / ৳1.00) -> 8 Full-screen Ads
+            1 -> 4 // 3 coins (৳0.03) -> 4 Full-screen Ads
+            2 -> 4 // 3 coins (৳0.03) -> 4 Full-screen Ads
+            3 -> 5 // 4 coins (৳0.04) -> 5 Full-screen Ads
+            4 -> 5 // 4 coins (৳0.04) -> 5 Full-screen Ads
+            5 -> 6 // 5 coins (৳0.05) -> 6 Full-screen Ads
+            6 -> 7 // 6 coins (৳0.06) -> 7 Full-screen Ads
+            else -> 10 // Day 7 (8 coins / ৳0.08) -> 10 Full-screen Ads
         }
     }
 

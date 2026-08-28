@@ -715,7 +715,7 @@ fun SpinBarDialog(
 
                 // Spin Bar Options Preview Chips
                 Text(
-                    text = "স্পিন হুইলের পয়েন্ট ঘর (২ পয়সা, ৩ পয়সা, ৫ পয়সা, ১০ পয়সা...):",
+                    text = "স্পিন হুইল বোনাস ড্র (+১ কয়েন / +২ কয়েন বোনাস):",
                     fontSize = 11.sp,
                     color = Color.LightGray,
                     textAlign = TextAlign.Center
@@ -726,7 +726,7 @@ fun SpinBarDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    val prizes = listOf("১প" to Color(0xFF42A5F5), "২প" to Color(0xFF66BB6A), "৩প" to Color(0xFFAB47BC), "৫প" to Color(0xFFFFA726), "১০প 🔥" to Color(0xFFFFD700))
+                    val prizes = listOf("+১ কয়েন (১প)" to Color(0xFF42A5F5), "+২ কয়েন (২প) 🔥" to Color(0xFFFFD700))
                     for ((label, color) in prizes) {
                         Surface(
                             color = color.copy(alpha = 0.2f),
@@ -735,10 +735,10 @@ fun SpinBarDialog(
                         ) {
                             Text(
                                 text = label,
-                                fontSize = 10.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = color,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
                             )
                         }
                     }
@@ -758,12 +758,12 @@ fun SpinBarDialog(
                     // Wheel Canvas with 6 colored sectors
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val colors = listOf(
-                            Color(0xFF1E88E5), // 1p
-                            Color(0xFF43A047), // 2p
-                            Color(0xFF8E24AA), // 3p
-                            Color(0xFFFB8C00), // 5p
-                            Color(0xFFFFB300), // 10p
-                            Color(0xFFE53935)  // 15p
+                            Color(0xFF1E88E5), // +1p
+                            Color(0xFFFFB300), // +2p
+                            Color(0xFF43A047), // +1p
+                            Color(0xFFFF8F00), // +2p
+                            Color(0xFF8E24AA), // +1p
+                            Color(0xFFFFD700)  // +2p
                         )
                         val sweep = 360f / 6f
 
@@ -809,39 +809,16 @@ fun SpinBarDialog(
                                         delay(70)
                                     }
 
-                                    // Determine Outcome based on probabilities:
+                                    // Determine Outcome based on balanced profitable probabilities:
                                     val rand = Random.nextInt(100) // 0..99
-                                    when {
-                                        rand < 3 -> { // 3% chance -> 15 Paisa (0.15 Taka Mega Jackpot)
-                                            wonBonusTaka = 0.15
-                                            isJackpotWinner = true
-                                            spinMessage = "🎉 মেগা জ্যাকপট! আপনি ১৫ পয়সা (৳০.১৫) ড্র বোনাস জিতেছেন!"
-                                        }
-                                        rand in 3..12 -> { // 10% chance -> 10 Paisa (0.10 Taka Jackpot)
-                                            wonBonusTaka = 0.10
-                                            isJackpotWinner = true
-                                            spinMessage = "🎉 জ্যাকপট! আপনি ১০ পয়সা (৳০.১০) বোনাস জিতেছেন!"
-                                        }
-                                        rand in 13..32 -> { // 20% chance -> 5 Paisa (0.05 Taka)
-                                            wonBonusTaka = 0.05
-                                            isJackpotWinner = false
-                                            spinMessage = "⭐ অভিনন্দন! আপনি ৫ পয়সা (৳০.০৫) ড্র বোনাস পেয়েছেন!"
-                                        }
-                                        rand in 33..62 -> { // 30% chance -> 3 Paisa (0.03 Taka)
-                                            wonBonusTaka = 0.03
-                                            isJackpotWinner = false
-                                            spinMessage = "✨ অভিনন্দন! আপনি ৩ পয়সা (৳০.০৩) ড্র বোনাস পেয়েছেন!"
-                                        }
-                                        rand in 63..87 -> { // 25% chance -> 2 Paisa (0.02 Taka)
-                                            wonBonusTaka = 0.02
-                                            isJackpotWinner = false
-                                            spinMessage = "✨ অভিনন্দন! আপনি ২ পয়সা (৳০.০২) ড্র বোনাস পেয়েছেন!"
-                                        }
-                                        else -> { // 12% chance -> 1 Paisa (0.01 Taka)
-                                            wonBonusTaka = 0.01
-                                            isJackpotWinner = false
-                                            spinMessage = "👍 অভিনন্দন! আপনি ১ পয়সা (৳০.০১) ড্র বোনাস পেয়েছেন!"
-                                        }
+                                    if (rand < 40) { // 40% chance -> 2 Paisa (0.02 Taka / 2 Coins bonus)
+                                        wonBonusTaka = 0.02
+                                        isJackpotWinner = true
+                                        spinMessage = "🎉 মেগা স্পিন! আপনি +২ কয়েন (৳০.০২) এক্সট্রা বোনাস জিতেছেন!"
+                                    } else { // 60% chance -> 1 Paisa (0.01 Taka / 1 Coin bonus)
+                                        wonBonusTaka = 0.01
+                                        isJackpotWinner = false
+                                        spinMessage = "⭐ অভিনন্দন! আপনি +১ কয়েন (৳০.০১) স্পিন বোনাস পেয়েছেন!"
                                     }
 
                                     isSpinning = false

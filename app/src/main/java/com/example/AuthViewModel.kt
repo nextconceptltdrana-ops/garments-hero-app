@@ -163,13 +163,28 @@ class AuthViewModel : ViewModel() {
 
     fun playLoginAdForAdmin(activity: android.app.Activity, onFinished: (() -> Unit)? = null) {
         _userMessage.value = "লগইন সফল! এডমিন প্যানেলের জন্য বিজ্ঞাপন প্লে হচ্ছে..."
-        AdManager.showFullScreenAd(activity) {
-            FirebaseUserManager.recordAdminAdImpression(adTakaAmount = 1.25) {
-                _userMessage.value = "লগইন এড সম্পন্ন হয়েছে (রাজস্ব সরাসরি এডমিন চ্যানেলে যুক্ত হয়েছে)।"
-                _isSuccessMsg.value = true
-                onFinished?.invoke()
+        AdManager.showFullScreenAd(
+            activity = activity,
+            onFallback = {
+                _showAdOverlay.value = true
+                _currentAdTitle.value = "লগইন স্পন্সরড এড"
+                _currentAdIndex.value = 1
+                onAdDismissedCallback = {
+                    FirebaseUserManager.recordAdminAdImpression(adTakaAmount = 1.25) {
+                        _userMessage.value = "লগইন এড সম্পন্ন হয়েছে (রাজস্ব সরাসরি এডমিন চ্যানেলে যুক্ত হয়েছে)।"
+                        _isSuccessMsg.value = true
+                        onFinished?.invoke()
+                    }
+                }
+            },
+            onAdDismissed = {
+                FirebaseUserManager.recordAdminAdImpression(adTakaAmount = 1.25) {
+                    _userMessage.value = "লগইন এড সম্পন্ন হয়েছে (রাজস্ব সরাসরি এডমিন চ্যানেলে যুক্ত হয়েছে)।"
+                    _isSuccessMsg.value = true
+                    onFinished?.invoke()
+                }
             }
-        }
+        )
     }
 
     fun onHeaderClicked() {
@@ -244,13 +259,6 @@ class AuthViewModel : ViewModel() {
                 FirebaseUserManager.loginUser(context, saved.mobile) { success, _, updatedUser ->
                     if (success && updatedUser != null) {
                         _currentUser.value = updatedUser
-                        if (!hasPlayedSessionAd) {
-                            hasPlayedSessionAd = true
-                            val activity = findActivity(context)
-                            if (activity != null) {
-                                playLoginAdForAdmin(activity)
-                            }
-                        }
                     }
                 }
             }
@@ -346,6 +354,10 @@ class AuthViewModel : ViewModel() {
 
         AdManager.showFullScreenAd(
             activity = activity,
+            onFallback = {
+                _showAdOverlay.value = true
+                onAdDismissedCallback = onAdClosed
+            },
             onAdDismissed = {
                 onAdClosed()
             }
@@ -421,9 +433,9 @@ class AuthViewModel : ViewModel() {
                         _quizFlowState.value = QuizFlowState.LevelUpdate
                         _adStatusMessage.value = "লেভেল ও পয়েন্ট যোগ হচ্ছে..."
 
-                        val totalTakaEarned = 0.25 + pendingSpinBonusTaka
+                        val totalTakaEarned = 0.06 + pendingSpinBonusTaka
                         val bonusCoins = (pendingSpinBonusTaka * 100).toLong()
-                        val totalCoinsEarned = 25L + bonusCoins
+                        val totalCoinsEarned = 6L + bonusCoins
                         val previousLevel = _currentUser.value?.currentLevel ?: 1
 
                         completeCurrentLevel(
@@ -483,8 +495,8 @@ class AuthViewModel : ViewModel() {
 
     fun completeCurrentLevel(
         context: Context,
-        takaEarned: Double = 0.20,
-        coinsEarned: Long = 20L,
+        takaEarned: Double = 0.06,
+        coinsEarned: Long = 6L,
         onResult: ((User) -> Unit)? = null
     ) {
         val user = _currentUser.value ?: return

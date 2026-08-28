@@ -54,32 +54,30 @@ object AdManager {
     private var isInitialized = false
     private var isGmsAvailable = false
 
+    private var preloadedRewardedInterstitial: RewardedInterstitialAd? = null
+    private var preloadedRewarded: RewardedAd? = null
+    private var isLoadingRewardedInterstitial = false
+    private var isLoadingRewarded = false
+
     fun initialize(context: Context) {
         if (isInitialized) return
         isInitialized = true
 
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            try {
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    try {
-                        // Strict Production Configuration - Zero Test Device IDs
-                        val requestConfig = com.google.android.gms.ads.RequestConfiguration.Builder()
-                            .setTestDeviceIds(emptyList())
-                            .build()
-                        MobileAds.setRequestConfiguration(requestConfig)
+        try {
+            val requestConfig = com.google.android.gms.ads.RequestConfiguration.Builder()
+                .setTestDeviceIds(emptyList())
+                .build()
+            MobileAds.setRequestConfiguration(requestConfig)
 
-                        MobileAds.initialize(context.applicationContext) { initializationStatus ->
-                            Log.d(TAG, "Official AdMob SDK Initialized in 100% Production Mode: $initializationStatus")
-                            isGmsAvailable = true
-                        }
-                        isGmsAvailable = true
-                    } catch (e: Throwable) {
-                        Log.w(TAG, "MobileAds initialize warning: ${e.message}")
-                    }
-                }
-            } catch (e: Throwable) {
-                Log.w(TAG, "AdManager initialization error: ${e.message}")
+            MobileAds.initialize(context.applicationContext) { initializationStatus ->
+                Log.d(TAG, "Official AdMob SDK Initialized: $initializationStatus")
+                isGmsAvailable = true
+                preloadAds(context.applicationContext)
             }
+            isGmsAvailable = true
+            preloadAds(context.applicationContext)
+        } catch (e: Throwable) {
+            Log.w(TAG, "MobileAds initialize warning: ${e.message}")
         }
     }
 
@@ -102,12 +100,79 @@ object AdManager {
         return builder.build()
     }
 
+    fun preloadAds(context: Context) {
+        preloadRewardedInterstitial(context)
+        preloadRewarded(context)
+    }
+
+    private fun preloadRewardedInterstitial(context: Context) {
+        if (preloadedRewardedInterstitial != null || isLoadingRewardedInterstitial) return
+        isLoadingRewardedInterstitial = true
+
+        try {
+            val adRequest = createHighEcpmAdRequest()
+            RewardedInterstitialAd.load(
+                context,
+                REWARDED_INTERSTITIAL_AD_ID,
+                adRequest,
+                object : RewardedInterstitialAdLoadCallback() {
+                    override fun onAdLoaded(ad: RewardedInterstitialAd) {
+                        Log.d(TAG, "RewardedInterstitialAd preloaded successfully into memory")
+                        preloadedRewardedInterstitial = ad
+                        isLoadingRewardedInterstitial = false
+                    }
+
+                    override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                        Log.w(TAG, "RewardedInterstitialAd preload failed: ${loadAdError.message} (code: ${loadAdError.code})")
+                        preloadedRewardedInterstitial = null
+                        isLoadingRewardedInterstitial = false
+                    }
+                }
+            )
+        } catch (e: Throwable) {
+            Log.e(TAG, "Exception during RewardedInterstitialAd preload: ${e.message}", e)
+            isLoadingRewardedInterstitial = false
+        }
+    }
+
+    private fun preloadRewarded(context: Context) {
+        if (preloadedRewarded != null || isLoadingRewarded) return
+        isLoadingRewarded = true
+
+        try {
+            val adRequest = createHighEcpmAdRequest()
+            RewardedAd.load(
+                context,
+                REWARDED_AD_ID,
+                adRequest,
+                object : RewardedAdLoadCallback() {
+                    override fun onAdLoaded(ad: RewardedAd) {
+                        Log.d(TAG, "RewardedAd preloaded successfully into memory")
+                        preloadedRewarded = ad
+                        isLoadingRewarded = false
+                    }
+
+                    override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                        Log.w(TAG, "RewardedAd preload failed: ${loadAdError.message} (code: ${loadAdError.code})")
+                        preloadedRewarded = null
+                        isLoadingRewarded = false
+                    }
+                }
+            )
+        } catch (e: Throwable) {
+            Log.e(TAG, "Exception during RewardedAd preload: ${e.message}", e)
+            isLoadingRewarded = false
+        }
+    }
+
     /**
      * Show standard AdMob Full Screen Ad (Rewarded Interstitial / Rewarded)
-     * using official Google Android SDK FullScreenContentCallback listeners.
+     * If already preloaded in memory, it presents instantly.
+     * If not available (e.g. fresh install / no fill on test phone), calls onFallback to display rich interactive sponsor ad.
      */
     fun showFullScreenAd(
         activity: Activity,
+        onFallback: () -> Unit,
         onAdDismissed: () -> Unit
     ) {
         initialize(activity)
@@ -118,103 +183,73 @@ object AdManager {
         } catch (e: Throwable) {
             // Ignore if already set
         }
-        Log.d(TAG, "Requesting and presenting standard Google AdMob Ad...")
 
-        try {
-            val adRequest = createHighEcpmAdRequest()
-
-            RewardedInterstitialAd.load(
-                activity,
-                REWARDED_INTERSTITIAL_AD_ID,
-                adRequest,
-                object : RewardedInterstitialAdLoadCallback() {
-                    override fun onAdLoaded(ad: RewardedInterstitialAd) {
-                        Log.d(TAG, "RewardedInterstitialAd loaded successfully")
-                        ad.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
-                            override fun onAdDismissedFullScreenContent() {
-                                Log.d(TAG, "Ad dismissed by user")
-                                onAdDismissed()
-                            }
-
-                            override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
-                                Log.e(TAG, "Ad failed to show: ${error.message}")
-                                onAdDismissed()
-                            }
-
-                            override fun onAdShowedFullScreenContent() {
-                                Log.d(TAG, "Ad presented full screen")
-                            }
-                        }
-                        try {
-                            ad.show(activity) { rewardItem ->
-                                Log.d(TAG, "User earned reward: ${rewardItem.amount} ${rewardItem.type}")
-                            }
-                        } catch (e: Throwable) {
-                            Log.e(TAG, "Exception showing RewardedInterstitialAd: ${e.message}", e)
-                            onAdDismissed()
-                        }
-                    }
-
-                    override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                        Log.w(TAG, "RewardedInterstitialAd load failed: ${loadAdError.message}. Falling back to RewardedAd...")
-                        loadRewardedAd(activity, onAdDismissed)
-                    }
+        val cachedInterstitial = preloadedRewardedInterstitial
+        if (cachedInterstitial != null) {
+            preloadedRewardedInterstitial = null
+            Log.d(TAG, "Presenting preloaded RewardedInterstitialAd")
+            cachedInterstitial.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                    Log.d(TAG, "RewardedInterstitialAd dismissed")
+                    preloadAds(activity.applicationContext)
+                    onAdDismissed()
                 }
-            )
-        } catch (e: Throwable) {
-            Log.e(TAG, "Error initiating RewardedInterstitialAd: ${e.message}", e)
-            loadRewardedAd(activity, onAdDismissed)
-        }
-    }
 
-    private fun loadRewardedAd(
-        activity: Activity,
-        onAdDismissed: () -> Unit
-    ) {
-        try {
-            val adRequest = createHighEcpmAdRequest()
-            RewardedAd.load(
-                activity,
-                REWARDED_AD_ID,
-                adRequest,
-                object : RewardedAdLoadCallback() {
-                    override fun onAdLoaded(ad: RewardedAd) {
-                        Log.d(TAG, "RewardedAd loaded successfully")
-                        ad.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
-                            override fun onAdDismissedFullScreenContent() {
-                                Log.d(TAG, "RewardedAd dismissed by user")
-                                onAdDismissed()
-                            }
-
-                            override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
-                                Log.e(TAG, "RewardedAd failed to show: ${error.message}")
-                                onAdDismissed()
-                            }
-
-                            override fun onAdShowedFullScreenContent() {
-                                Log.d(TAG, "RewardedAd presented full screen")
-                            }
-                        }
-                        try {
-                            ad.show(activity) { rewardItem ->
-                                Log.d(TAG, "RewardedAd reward earned: ${rewardItem.amount}")
-                            }
-                        } catch (e: Throwable) {
-                            Log.e(TAG, "Exception showing RewardedAd: ${e.message}", e)
-                            onAdDismissed()
-                        }
-                    }
-
-                    override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                        Log.e(TAG, "RewardedAd load failed: ${loadAdError.message}")
-                        onAdDismissed()
-                    }
+                override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
+                    Log.e(TAG, "RewardedInterstitialAd failed to show: ${error.message}")
+                    preloadAds(activity.applicationContext)
+                    onFallback()
                 }
-            )
-        } catch (e: Throwable) {
-            Log.e(TAG, "Error initiating RewardedAd load: ${e.message}", e)
-            onAdDismissed()
+
+                override fun onAdShowedFullScreenContent() {
+                    Log.d(TAG, "RewardedInterstitialAd presented full screen")
+                }
+            }
+            try {
+                cachedInterstitial.show(activity) { rewardItem ->
+                    Log.d(TAG, "User earned reward: ${rewardItem.amount} ${rewardItem.type}")
+                }
+                return
+            } catch (e: Throwable) {
+                Log.e(TAG, "Exception showing cached RewardedInterstitialAd: ${e.message}", e)
+            }
         }
+
+        val cachedRewarded = preloadedRewarded
+        if (cachedRewarded != null) {
+            preloadedRewarded = null
+            Log.d(TAG, "Presenting preloaded RewardedAd")
+            cachedRewarded.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                    Log.d(TAG, "RewardedAd dismissed")
+                    preloadAds(activity.applicationContext)
+                    onAdDismissed()
+                }
+
+                override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
+                    Log.e(TAG, "RewardedAd failed to show: ${error.message}")
+                    preloadAds(activity.applicationContext)
+                    onFallback()
+                }
+
+                override fun onAdShowedFullScreenContent() {
+                    Log.d(TAG, "RewardedAd presented full screen")
+                }
+            }
+            try {
+                cachedRewarded.show(activity) { rewardItem ->
+                    Log.d(TAG, "RewardedAd reward earned: ${rewardItem.amount}")
+                }
+                return
+            } catch (e: Throwable) {
+                Log.e(TAG, "Exception showing cached RewardedAd: ${e.message}", e)
+            }
+        }
+
+        // Neither ad was preloaded in memory: Trigger fallback UI & preload for next slot
+        Log.d(TAG, "No preloaded ad in memory. Triggering fallback interactive ad & starting background fetch.")
+        preloadAds(activity.applicationContext)
+        onFallback()
     }
 }
 

@@ -38,6 +38,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import java.text.NumberFormat
 import java.util.*
 
@@ -789,6 +791,16 @@ fun UserIncomeDashboard(
         )
     }
 
+    if (showAdOverlay) {
+        FullScreenInteractiveAdDialog(
+            adTitle = currentAdTitle ?: "স্পন্সরড ভিডিও বিজ্ঞাপন",
+            adIndex = currentAdIndex,
+            onFinished = {
+                viewModel.dismissAdOverlay()
+            }
+        )
+    }
+
     if (checkInResultData != null) {
         DailyCheckInCelebrationDialog(
             data = checkInResultData!!,
@@ -796,6 +808,232 @@ fun UserIncomeDashboard(
                 viewModel.dismissCheckInDialog()
             }
         )
+    }
+}
+
+@Composable
+fun FullScreenInteractiveAdDialog(
+    adTitle: String,
+    adIndex: Int,
+    onFinished: () -> Unit
+) {
+    var secondsRemaining by remember { mutableIntStateOf(5) }
+    var isReadyToProceed by remember { mutableStateOf(false) }
+
+    val sponsorList = remember {
+        listOf(
+            SponsoredBannerData(
+                brand = "Daraz Online Shopping",
+                tagline = "মেগা ডিসকাউন্ট অফার! ৫০% পর্যন্ত ছাড় + ফ্রি ডেলিভারি",
+                actionText = "শপ করুন",
+                badge = "OFFICIAL SPONSOR",
+                iconEmoji = "🛍️",
+                bgGradient = listOf(Color(0xFF881337), Color(0xFF4C0519)),
+                btnColor = Color(0xFFF43F5E)
+            ),
+            SponsoredBannerData(
+                brand = "bKash Digital Payment",
+                tagline = "অ্যাপ দিয়ে পেমেন্টে পাবেন ইনস্ট্যান্ট ২০% ক্যাশব্যাক ও সেন্ড মানি বোনাস!",
+                actionText = "ক্যাশব্যাক নিন",
+                badge = "FEATURED PARTNER",
+                iconEmoji = "💳",
+                bgGradient = listOf(Color(0xFF831843), Color(0xFF1E1B4B)),
+                btnColor = Color(0xFFE11D48)
+            ),
+            SponsoredBannerData(
+                brand = "Binance Crypto Exchange",
+                tagline = "ট্রেড করুন বিশ্বের সেরা প্ল্যাটফর্মে, জিরো ফিতে আজই একাউন্ট খুলুন",
+                actionText = "ট্রেড করুন",
+                badge = "PROMO AD",
+                iconEmoji = "📈",
+                bgGradient = listOf(Color(0xFF451A03), Color(0xFF1C1917)),
+                btnColor = Color(0xFFF59E0B)
+            ),
+            SponsoredBannerData(
+                brand = "Samsung Galaxy S24 Ultra",
+                tagline = "Galaxy AI এর সাথে স্মার্টফোনের ভবিষ্যৎ আজই উপভোগ করুন",
+                actionText = "অর্ডার করুন",
+                badge = "PREMIUM BRAND",
+                iconEmoji = "📱",
+                bgGradient = listOf(Color(0xFF0C4A6E), Color(0xFF082F49)),
+                btnColor = Color(0xFF0284C7)
+            ),
+            SponsoredBannerData(
+                brand = "Foodpanda Delivery",
+                tagline = "প্রথম অর্ডারে পান ৫০% ছাড় ও ৩০ মিনিটে এক্সপ্রেস ডেলিভারি!",
+                actionText = "অর্ডার দিন",
+                badge = "HOT DEAL",
+                iconEmoji = "🍕",
+                bgGradient = listOf(Color(0xFF881337), Color(0xFF4C0519)),
+                btnColor = Color(0xFFEC4899)
+            )
+        )
+    }
+
+    val currentSponsor = remember(adIndex) {
+        val safeIdx = if (adIndex > 0) (adIndex - 1) % sponsorList.size else 0
+        sponsorList[safeIdx]
+    }
+
+    LaunchedEffect(Unit) {
+        while (secondsRemaining > 0) {
+            kotlinx.coroutines.delay(1000)
+            secondsRemaining -= 1
+        }
+        isReadyToProceed = true
+    }
+
+    Dialog(
+        onDismissRequest = {
+            if (isReadyToProceed) onFinished()
+        },
+        properties = DialogProperties(
+            dismissOnBackPress = isReadyToProceed,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF0A0F1D))
+                .padding(20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF131E35)),
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.5.dp, Color(0xFFFFD700)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Top Ad Header Bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            color = Color(0xFFFFD700).copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, Color(0xFFFFD700))
+                        ) {
+                            Text(
+                                text = "🏆 $adTitle",
+                                color = Color(0xFFFFD700),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        Surface(
+                            color = if (isReadyToProceed) Color(0xFF10B981) else Color(0xFF3B82F6),
+                            shape = CircleShape
+                        ) {
+                            Text(
+                                text = if (isReadyToProceed) "✓ সম্পন্ন" else "${secondsRemaining}s",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // Sponsor Card Box
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(170.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Brush.verticalGradient(currentSponsor.bgGradient))
+                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Surface(
+                                color = Color.Black.copy(alpha = 0.4f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(54.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(text = currentSponsor.iconEmoji, fontSize = 28.sp)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = currentSponsor.brand,
+                                color = Color.White,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 17.sp,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = currentSponsor.tagline,
+                                color = Color(0xFFE2E8F0),
+                                fontSize = 11.5.sp,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    if (!isReadyToProceed) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color(0xFFFFD700),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "বিজ্ঞাপন লোড ও ভেরিফাই হচ্ছে ($secondsRemaining সেকেন্ড)...",
+                                color = Color.LightGray,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    } else {
+                        Button(
+                            onClick = onFinished,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "পুরস্কার গ্রহণ করুন এবং এগিয়ে যান ➔",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -2921,13 +3159,13 @@ fun DailyCheckInCard(
     }
 
     val daysRewards = listOf(
-        Triple(1, 0.20, 20L),
-        Triple(2, 0.25, 25L),
-        Triple(3, 0.30, 30L),
-        Triple(4, 0.35, 35L),
-        Triple(5, 0.40, 40L),
-        Triple(6, 0.50, 50L),
-        Triple(7, 1.00, 100L)
+        Triple(1, 0.03, 3L),
+        Triple(2, 0.03, 3L),
+        Triple(3, 0.04, 4L),
+        Triple(4, 0.04, 4L),
+        Triple(5, 0.05, 5L),
+        Triple(6, 0.06, 6L),
+        Triple(7, 0.08, 8L)
     )
 
     val goldGradient = Brush.horizontalGradient(
@@ -3117,7 +3355,7 @@ fun DailyCheckInCard(
 
             // Action Button
             if (isEligible) {
-                val (_, nextTaka, nextCoins) = daysRewards.find { it.first == activeDay } ?: Triple(1, 0.20, 20L)
+                val (_, nextTaka, nextCoins) = daysRewards.find { it.first == activeDay } ?: Triple(1, 0.03, 3L)
                 val totalReqAds = FirebaseUserManager.getRequiredAdsForStreak(activeDay)
 
                 Button(
