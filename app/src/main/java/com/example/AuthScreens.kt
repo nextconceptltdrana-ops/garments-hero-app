@@ -628,6 +628,8 @@ fun UserIncomeDashboard(
     val levelCompletionData by viewModel.levelCompletionData.collectAsState()
     val checkInResultData by viewModel.checkInResultData.collectAsState()
     val isClaimingCheckIn by viewModel.isClaimingCheckIn.collectAsState()
+    val referredUsers by viewModel.referredUsersList.collectAsState()
+    val isSyncingReferrals by viewModel.isSyncingReferrals.collectAsState()
 
     Column(
         modifier = Modifier
@@ -727,6 +729,11 @@ fun UserIncomeDashboard(
         UserAccountDetailsCard(
             user = user,
             context = context,
+            referredUsers = referredUsers,
+            isSyncing = isSyncingReferrals,
+            onRefreshReferrals = {
+                viewModel.refreshReferralData(context)
+            },
             onPrivacyPolicyClick = {
                 viewModel.openPrivacyPolicy()
             },
@@ -1619,6 +1626,9 @@ fun LevelPlayCard(
 fun UserAccountDetailsCard(
     user: User,
     context: Context,
+    referredUsers: List<User> = emptyList(),
+    isSyncing: Boolean = false,
+    onRefreshReferrals: () -> Unit = {},
     onPrivacyPolicyClick: () -> Unit,
     onFairPlayClick: () -> Unit,
     onDeleteAccountClick: () -> Unit,
@@ -1631,60 +1641,192 @@ fun UserAccountDetailsCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Text(
-                text = "অ্যাফিলিয়েট ও রেফারেল তথ্য",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // Referral Code Row
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.CardGiftcard,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp)
+                Text(
+                    text = "অ্যাফিলিয়েট ও রেফারেল তথ্য",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "আপনার রেফারেল কোড", fontSize = 12.sp, color = Color.Gray)
-                    Text(
-                        text = user.referralCode,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Referral Code", user.referralCode)
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "রেফারেল কোড কপি করা হয়েছে!", Toast.LENGTH_SHORT).show()
-                    }
+                TextButton(
+                    onClick = onRefreshReferrals,
+                    enabled = !isSyncing
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "Copy",
-                        tint = MaterialTheme.colorScheme.primary
-                    )
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("সিঙ্ক হচ্ছে...", fontSize = 12.sp)
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Sync",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("সিঙ্ক রিফ্রেশ", fontSize = 12.sp)
+                    }
                 }
             }
 
-            Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Referral Code Row
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CardGiftcard,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = "আপনার রেফারেল কোড", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = user.referralCode,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("Referral Code", user.referralCode)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "রেফারেল কোড কপি করা হয়েছে!", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copy",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
+                                    "গার্মেন্টস হিরো অ্যাপে যোগ দিন এবং প্রতিদিন ইনকাম করুন!\nআমার রেফারেল কোড: ${user.referralCode}\nনিবন্ধনের সময় রেফার কোড ব্যবহার করুন।"
+                                )
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "রেফার কোড শেয়ার করুন"))
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             ProfileItemRow(
                 icon = Icons.Default.GroupAdd,
                 label = "মোট সফল রেফারেল",
                 value = "${user.referralsCount} জন (উইথড্র এর জন্য ৩টি প্রয়োজন)"
             )
+
+            // Show Referral Progress Bar towards 3 referrals
+            val refCount = user.referralsCount
+            val progress = (refCount / 3f).coerceIn(0f, 1f)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp),
+                    color = if (refCount >= 3) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.outlineVariant
+                )
+                Text(
+                    text = if (refCount >= 3) "✅ ৩টি রেফারেল শর্ত পূরণ হয়েছে! আপনি উইথড্র করতে পারবেন।"
+                    else "উইথড্র করার যোগ্যতা অর্জন করতে আরও ${3 - refCount} টি রেফারেল প্রয়োজন।",
+                    fontSize = 11.sp,
+                    color = if (refCount >= 3) Color(0xFF2E7D32) else Color.Gray,
+                    fontWeight = if (refCount >= 3) FontWeight.Bold else FontWeight.Normal,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            if (referredUsers.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text(
+                            text = "আপনার সফল রেফারেল তালিকা (${referredUsers.size} জন):",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        referredUsers.forEach { refUser ->
+                            val maskedMobile = if (refUser.mobile.length >= 7) {
+                                refUser.mobile.take(5) + "****" + refUser.mobile.takeLast(2)
+                            } else refUser.mobile
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF2E7D32),
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${refUser.name} ($maskedMobile)",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                                Text(
+                                    text = "+৳৫.০০",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2E7D32)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
 

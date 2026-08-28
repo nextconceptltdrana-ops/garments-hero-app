@@ -242,6 +242,14 @@ class AuthViewModel : ViewModel() {
     }
 
 
+    private var userSnapshotListener: com.google.firebase.firestore.ListenerRegistration? = null
+
+    private val _referredUsersList = MutableStateFlow<List<User>>(emptyList())
+    val referredUsersList: StateFlow<List<User>> = _referredUsersList.asStateFlow()
+
+    private val _isSyncingReferrals = MutableStateFlow(false)
+    val isSyncingReferrals: StateFlow<Boolean> = _isSyncingReferrals.asStateFlow()
+
     private val _isAppBlocked = MutableStateFlow(false)
     val isAppBlocked: StateFlow<Boolean> = _isAppBlocked.asStateFlow()
 
@@ -252,6 +260,11 @@ class AuthViewModel : ViewModel() {
         val saved = FirebaseUserManager.getSavedSession(context)
         _currentUser.value = saved
 
+        if (saved != null && saved.mobile.isNotEmpty()) {
+            startListeningToUser(context, saved.mobile)
+            refreshReferralData(context)
+        }
+
         // Sync any cached unsynced points from previous session or unexpected close
         FirebaseUserManager.syncPendingProgressToFirestore(context) {
             // Sync fresh level & user details directly from Firestore
@@ -259,6 +272,7 @@ class AuthViewModel : ViewModel() {
                 FirebaseUserManager.loginUser(context, saved.mobile) { success, _, updatedUser ->
                     if (success && updatedUser != null) {
                         _currentUser.value = updatedUser
+                        refreshReferralData(context)
                     }
                 }
             }
@@ -266,6 +280,23 @@ class AuthViewModel : ViewModel() {
 
         // Check Firebase active status / deletion kill-switch
         verifyAppStatus()
+    }
+
+    private fun startListeningToUser(context: Context, mobile: String) {
+        userSnapshotListener?.remove()
+        userSnapshotListener = FirebaseUserManager.listenToUser(context, mobile) { updatedUser ->
+            _currentUser.value = updatedUser
+        }
+    }
+
+    fun refreshReferralData(context: Context) {
+        val user = _currentUser.value ?: return
+        _isSyncingReferrals.value = true
+        FirebaseUserManager.syncAndFetchReferredUsers(context, user) { updatedUser, list ->
+            _isSyncingReferrals.value = false
+            _currentUser.value = updatedUser
+            _referredUsersList.value = list
+        }
     }
 
     fun verifyAppStatus() {
@@ -316,6 +347,8 @@ class AuthViewModel : ViewModel() {
             _userMessage.value = msg
             if (success && user != null) {
                 _currentUser.value = user
+                startListeningToUser(context, user.mobile)
+                refreshReferralData(context)
             }
         }
     }
@@ -333,6 +366,8 @@ class AuthViewModel : ViewModel() {
             _userMessage.value = msg
             if (success && user != null) {
                 _currentUser.value = user
+                startListeningToUser(context, user.mobile)
+                refreshReferralData(context)
                 hasPlayedSessionAd = true
                 val activity = findActivity(context)
                 if (activity != null) {
@@ -546,10 +581,13 @@ class AuthViewModel : ViewModel() {
     }
 
     fun logout(context: Context) {
+        userSnapshotListener?.remove()
+        userSnapshotListener = null
         hasPlayedSessionAd = false
         FirebaseUserManager.syncPendingProgressToFirestore(context)
         FirebaseUserManager.clearSession(context)
         _currentUser.value = null
+        _referredUsersList.value = emptyList()
         _loginMobile.value = ""
         _registerName.value = ""
         _registerMobile.value = ""
@@ -738,7 +776,10 @@ class AuthViewModel : ViewModel() {
         FirebaseUserManager.deleteAccountAndData(context, user.mobile) { success, message ->
             _isDeletingAccount.value = false
             _showDeleteAccountDialog.value = false
+            userSnapshotListener?.remove()
+            userSnapshotListener = null
             _currentUser.value = null
+            _referredUsersList.value = emptyList()
             _loginMobile.value = ""
             _registerName.value = ""
             _registerMobile.value = ""
@@ -747,6 +788,12 @@ class AuthViewModel : ViewModel() {
             _userMessage.value = message
             _isSuccessMsg.value = success
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        userSnapshotListener?.remove()
+        userSnapshotListener = null
     }
 }
 

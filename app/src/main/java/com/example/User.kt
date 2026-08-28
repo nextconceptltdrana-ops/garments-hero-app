@@ -1,8 +1,11 @@
 package com.example
 
 import androidx.annotation.Keep
+import com.google.firebase.firestore.Exclude
+import com.google.firebase.firestore.IgnoreExtraProperties
 
 @Keep
+@IgnoreExtraProperties
 data class User(
     val name: String = "",
     val mobile: String = "",
@@ -22,6 +25,7 @@ data class User(
         const val TOTAL_LEVELS = 100000 // ১ লক্ষ লেভেল
     }
 
+    @get:Exclude
     val remainingLevels: Int
         get() = (TOTAL_LEVELS - completedLevels).coerceAtLeast(0)
 }

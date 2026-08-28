@@ -133,17 +133,27 @@ object FirebaseUserManager {
                                 .addOnSuccessListener { refQuery ->
                                     if (!refQuery.isEmpty) {
                                         val refDoc = refQuery.documents[0]
-                                        val refCount = refDoc.getLong("referralsCount") ?: 0L
-                                        val refEarnings = refDoc.getDouble("earningsTaka") ?: 0.0
-                                        val refCoins = refDoc.getLong("rewardCoins") ?: 0L
-
                                         refDoc.reference.update(
                                             mapOf(
-                                                "referralsCount" to (refCount + 1),
-                                                "earningsTaka" to (refEarnings + 5.0),
-                                                "rewardCoins" to (refCoins + 500)
+                                                "referralsCount" to com.google.firebase.firestore.FieldValue.increment(1),
+                                                "earningsTaka" to com.google.firebase.firestore.FieldValue.increment(5.0),
+                                                "rewardCoins" to com.google.firebase.firestore.FieldValue.increment(500)
                                             )
                                         )
+                                    } else {
+                                        // Also try matching by mobile number in case they inputted phone
+                                        firestore.collection("users").document(cleanReferral).get()
+                                            .addOnSuccessListener { phoneDoc ->
+                                                if (phoneDoc.exists()) {
+                                                    phoneDoc.reference.update(
+                                                        mapOf(
+                                                            "referralsCount" to com.google.firebase.firestore.FieldValue.increment(1),
+                                                            "earningsTaka" to com.google.firebase.firestore.FieldValue.increment(5.0),
+                                                            "rewardCoins" to com.google.firebase.firestore.FieldValue.increment(500)
+                                                        )
+                                                    )
+                                                }
+                                            }
                                     }
                                 }
                         }
@@ -175,6 +185,103 @@ object FirebaseUserManager {
         }
     }
 
+    fun parseUserFromSnapshot(snapshot: com.google.firebase.firestore.DocumentSnapshot, fallbackMobile: String = ""): User {
+        val mobile = snapshot.getString("mobile") ?: snapshot.id.ifEmpty { fallbackMobile }
+        val refCount = (snapshot.getLong("referralsCount") ?: 0L).toInt()
+        return User(
+            name = snapshot.getString("name") ?: "ব্যবহারকারী",
+            mobile = mobile,
+            referralCode = snapshot.getString("referralCode") ?: generateReferralCode(mobile),
+            referredBy = snapshot.getString("referredBy") ?: "",
+            createdAt = snapshot.getLong("createdAt") ?: System.currentTimeMillis(),
+            currentLevel = (snapshot.getLong("currentLevel") ?: 1L).toInt(),
+            completedLevels = (snapshot.getLong("completedLevels") ?: 0L).toInt(),
+            rewardCoins = snapshot.getLong("rewardCoins") ?: 0L,
+            earningsTaka = snapshot.getDouble("earningsTaka") ?: 0.0,
+            referralsCount = refCount,
+            avatarUrl = snapshot.getString("avatarUrl") ?: "",
+            lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
+            checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt()
+        )
+    }
+
+    fun listenToUser(
+        context: Context,
+        mobile: String,
+        onUserUpdated: (User) -> Unit
+    ): com.google.firebase.firestore.ListenerRegistration? {
+        if (mobile.isEmpty()) return null
+        val cleanMobile = normalizeMobile(mobile)
+        return firestore.collection("users").document(cleanMobile)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null || snapshot == null || !snapshot.exists()) {
+                    return@addSnapshotListener
+                }
+                val user = parseUserFromSnapshot(snapshot, cleanMobile)
+                saveSession(context, user)
+                onUserUpdated(user)
+            }
+    }
+
+    fun syncAndFetchReferredUsers(
+        context: Context,
+        user: User,
+        onResult: (updatedUser: User, referredList: List<User>) -> Unit
+    ) {
+        if (user.mobile.isEmpty()) {
+            onResult(user, emptyList())
+            return
+        }
+
+        val myCode = user.referralCode.trim().uppercase()
+        val myMobile = user.mobile.trim()
+
+        firestore.collection("users")
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val referredList = mutableListOf<User>()
+                for (doc in querySnapshot.documents) {
+                    if (doc.id == user.mobile) continue
+                    val docReferredBy = (doc.getString("referredBy") ?: "").trim().uppercase()
+                    if (docReferredBy.isNotEmpty() && (docReferredBy == myCode || docReferredBy == myMobile)) {
+                        referredList.add(parseUserFromSnapshot(doc))
+                    }
+                }
+
+                val actualCount = referredList.size
+                if (actualCount > user.referralsCount) {
+                    val missingBonusCount = actualCount - user.referralsCount
+                    val extraTaka = missingBonusCount * 5.0
+                    val extraCoins = (missingBonusCount * 500).toLong()
+
+                    val newTotalTaka = user.earningsTaka + extraTaka
+                    val newTotalCoins = user.rewardCoins + extraCoins
+
+                    firestore.collection("users").document(user.mobile)
+                        .update(
+                            mapOf(
+                                "referralsCount" to actualCount,
+                                "earningsTaka" to newTotalTaka,
+                                "rewardCoins" to newTotalCoins
+                            )
+                        )
+
+                    val correctedUser = user.copy(
+                        referralsCount = actualCount,
+                        earningsTaka = newTotalTaka,
+                        rewardCoins = newTotalCoins
+                    )
+                    saveSession(context, correctedUser)
+                    onResult(correctedUser, referredList.sortedByDescending { it.createdAt })
+                } else {
+                    onResult(user, referredList.sortedByDescending { it.createdAt })
+                }
+            }
+            .addOnFailureListener {
+                onResult(user, emptyList())
+            }
+    }
+
     fun loginUser(
         context: Context,
         mobile: String,
@@ -191,22 +298,9 @@ object FirebaseUserManager {
 
         userDocRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
-                val user = snapshot.toObject(User::class.java) ?: User(
-                    name = snapshot.getString("name") ?: "ব্যবহারকারী",
-                    mobile = cleanMobile,
-                    referralCode = snapshot.getString("referralCode") ?: generateReferralCode(cleanMobile),
-                    referredBy = snapshot.getString("referredBy") ?: "",
-                    createdAt = snapshot.getLong("createdAt") ?: System.currentTimeMillis(),
-                    currentLevel = (snapshot.getLong("currentLevel") ?: 1L).toInt(),
-                    completedLevels = (snapshot.getLong("completedLevels") ?: 0L).toInt(),
-                    rewardCoins = snapshot.getLong("rewardCoins") ?: 0L,
-                    earningsTaka = snapshot.getDouble("earningsTaka") ?: 0.0,
-                    avatarUrl = snapshot.getString("avatarUrl") ?: "",
-                    lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
-                    checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt()
-                )
+                val user = parseUserFromSnapshot(snapshot, cleanMobile)
                 saveSession(context, user)
-                Log.d(TAG, "User logged in successfully from Firestore: $cleanMobile")
+                Log.d(TAG, "User logged in successfully from Firestore: $cleanMobile (referrals: ${user.referralsCount})")
                 onResult(true, "স্বাগতম! লগইন সম্পন্ন হয়েছে।", user)
             } else {
                 val saved = getSavedSession(context)
