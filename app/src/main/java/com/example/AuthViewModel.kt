@@ -146,6 +146,21 @@ class AuthViewModel : ViewModel() {
     private val _adminLoginAdsRevenue = MutableStateFlow(0.0)
     val adminLoginAdsRevenue: StateFlow<Double> = _adminLoginAdsRevenue.asStateFlow()
 
+    private val _whatsappNumber = MutableStateFlow("01919085229")
+    val whatsappNumber: StateFlow<String> = _whatsappNumber.asStateFlow()
+
+    private val _whatsappGroupLink = MutableStateFlow("https://chat.whatsapp.com/CFweFxYB7Fk7X3sWJljF5b")
+    val whatsappGroupLink: StateFlow<String> = _whatsappGroupLink.asStateFlow()
+
+    private val _noticeText = MutableStateFlow("গার্মেন্টস হিরো অ্যাপে স্বাগতম! নিয়মিত কুইজ খেলে ও রেফার করে ইনকাম করুন।")
+    val noticeText: StateFlow<String> = _noticeText.asStateFlow()
+
+    private val _isNoticeActive = MutableStateFlow(true)
+    val isNoticeActive: StateFlow<Boolean> = _isNoticeActive.asStateFlow()
+
+    private val _isUpdatingConfig = MutableStateFlow(false)
+    val isUpdatingConfig: StateFlow<Boolean> = _isUpdatingConfig.asStateFlow()
+
     private val _isAdminLoading = MutableStateFlow(false)
     val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
 
@@ -220,16 +235,49 @@ class AuthViewModel : ViewModel() {
 
     fun loadAdminData() {
         _isAdminLoading.value = true
-        FirebaseUserManager.fetchAllWithdrawals { withdrawals ->
-            _adminWithdrawals.value = withdrawals
-            FirebaseUserManager.fetchAllUsers { users ->
-                _adminUsers.value = users
-                FirebaseUserManager.fetchAdminAdStats { count, revenue ->
-                    _adminLoginAdsCount.value = count
-                    _adminLoginAdsRevenue.value = revenue
-                    _isAdminLoading.value = false
+        FirebaseUserManager.getAdminConfig { whatsapp, groupLink, notice, isNoticeActive ->
+            _whatsappNumber.value = whatsapp
+            _whatsappGroupLink.value = groupLink
+            _noticeText.value = notice
+            _isNoticeActive.value = isNoticeActive
+            FirebaseUserManager.fetchAllWithdrawals { withdrawals ->
+                _adminWithdrawals.value = withdrawals
+                FirebaseUserManager.fetchAllUsers { users ->
+                    _adminUsers.value = users
+                    FirebaseUserManager.fetchAdminAdStats { count, revenue ->
+                        _adminLoginAdsCount.value = count
+                        _adminLoginAdsRevenue.value = revenue
+                        _isAdminLoading.value = false
+                    }
                 }
             }
+        }
+    }
+
+    fun updateAdminSettings(whatsapp: String, groupLink: String, notice: String, isNoticeActive: Boolean) {
+        _isUpdatingConfig.value = true
+        FirebaseUserManager.updateAdminConfig(whatsapp, groupLink, notice, isNoticeActive) { success ->
+            _isUpdatingConfig.value = false
+            if (success) {
+                _whatsappNumber.value = whatsapp
+                _whatsappGroupLink.value = groupLink
+                _noticeText.value = notice
+                _isNoticeActive.value = isNoticeActive
+                _userMessage.value = "এডমিন সেটিংস (WhatsApp ও নোটিশ) সফলভাবে আপডেট হয়েছে!"
+                _isSuccessMsg.value = true
+            } else {
+                _userMessage.value = "সেটিংস আপডেট ব্যর্থ হয়েছে! পুনরায় চেষ্টা করুন।"
+                _isSuccessMsg.value = false
+            }
+        }
+    }
+
+    fun fetchPublicAdminConfig() {
+        FirebaseUserManager.getAdminConfig { whatsapp, groupLink, notice, isNoticeActive ->
+            _whatsappNumber.value = whatsapp
+            _whatsappGroupLink.value = groupLink
+            _noticeText.value = notice
+            _isNoticeActive.value = isNoticeActive
         }
     }
 
@@ -280,6 +328,7 @@ class AuthViewModel : ViewModel() {
 
         // Check Firebase active status / deletion kill-switch
         verifyAppStatus()
+        fetchPublicAdminConfig()
     }
 
     private fun startListeningToUser(context: Context, mobile: String) {

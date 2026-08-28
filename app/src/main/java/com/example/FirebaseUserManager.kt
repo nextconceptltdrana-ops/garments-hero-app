@@ -616,6 +616,58 @@ object FirebaseUserManager {
         }
     }
 
+    fun getAdminConfig(onResult: (whatsappNumber: String, whatsappGroupLink: String, noticeText: String, isNoticeActive: Boolean) -> Unit) {
+        try {
+            firestore.collection("app_config").document("general")
+                .get()
+                .addOnSuccessListener { snapshot ->
+                    if (snapshot.exists()) {
+                        val whatsapp = snapshot.getString("whatsapp_number") ?: "01919085229"
+                        val groupLink = snapshot.getString("whatsapp_group_link") ?: "https://chat.whatsapp.com/CFweFxYB7Fk7X3sWJljF5b"
+                        val notice = snapshot.getString("notice_text") ?: "গার্মেন্টস হিরো অ্যাপে স্বাগতম! নিয়মিত কুইজ খেলে ও রেফার করে ইনকাম করুন।"
+                        val isNoticeActive = snapshot.getBoolean("is_notice_active") ?: true
+                        onResult(whatsapp, groupLink, notice, isNoticeActive)
+                    } else {
+                        onResult("01919085229", "https://chat.whatsapp.com/CFweFxYB7Fk7X3sWJljF5b", "গার্মেন্টস হিরো অ্যাপে স্বাগতম! নিয়মিত কুইজ খেলে ও রেফার করে ইনকাম করুন।", true)
+                    }
+                }
+                .addOnFailureListener {
+                    onResult("01919085229", "https://chat.whatsapp.com/CFweFxYB7Fk7X3sWJljF5b", "গার্মেন্টস হিরো অ্যাপে স্বাগতম! নিয়মিত কুইজ খেলে ও রেফার করে ইনকাম করুন।", true)
+                }
+        } catch (e: Exception) {
+            onResult("01919085229", "https://chat.whatsapp.com/CFweFxYB7Fk7X3sWJljF5b", "গার্মেন্টস হিরো অ্যাপে স্বাগতম! নিয়মিত কুইজ খেলে ও রেফার করে ইনকাম করুন।", true)
+        }
+    }
+
+    fun updateAdminConfig(
+        whatsappNumber: String,
+        whatsappGroupLink: String,
+        noticeText: String,
+        isNoticeActive: Boolean,
+        onComplete: (Boolean) -> Unit
+    ) {
+        try {
+            val data = mapOf(
+                "whatsapp_number" to whatsappNumber,
+                "whatsapp_group_link" to whatsappGroupLink,
+                "notice_text" to noticeText,
+                "is_notice_active" to isNoticeActive,
+                "updated_at" to System.currentTimeMillis()
+            )
+            firestore.collection("app_config").document("general")
+                .set(data, com.google.firebase.firestore.SetOptions.merge())
+                .addOnSuccessListener {
+                    onComplete(true)
+                }
+                .addOnFailureListener {
+                    onComplete(false)
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error updating admin config", e)
+            onComplete(false)
+        }
+    }
+
     fun checkAppStatus(onStatusChecked: (isActive: Boolean, blockMessage: String?) -> Unit) {
         try {
             firestore.collection("app_config").document("status")

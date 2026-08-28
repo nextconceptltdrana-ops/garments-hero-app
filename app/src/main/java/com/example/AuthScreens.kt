@@ -57,6 +57,114 @@ fun formatBanglaNumber(number: Any?): String {
     return sb.toString()
 }
 
+fun launchWhatsAppGroup(context: Context, groupUrl: String) {
+    val trimmedUrl = if (groupUrl.isNotBlank()) groupUrl.trim() else "https://chat.whatsapp.com/CFweFxYB7Fk7X3sWJljF5b"
+    val inviteCode = if (trimmedUrl.contains("chat.whatsapp.com/")) {
+        trimmedUrl.substringAfter("chat.whatsapp.com/").substringBefore("?").substringBefore("/").trim()
+    } else {
+        trimmedUrl.substringAfterLast("/").trim()
+    }
+
+    val waDeepLinkUri = if (inviteCode.isNotEmpty()) Uri.parse("whatsapp://chat?code=$inviteCode") else Uri.parse(trimmedUrl)
+    val webUri = Uri.parse(trimmedUrl)
+
+    val intentsToTry = listOf(
+        Intent(Intent.ACTION_VIEW, waDeepLinkUri).apply {
+            setPackage("com.whatsapp")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+        Intent(Intent.ACTION_VIEW, waDeepLinkUri).apply {
+            setPackage("com.whatsapp.w4b")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+        Intent(Intent.ACTION_VIEW, waDeepLinkUri).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+        Intent(Intent.ACTION_VIEW, webUri).apply {
+            setPackage("com.whatsapp")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+        Intent(Intent.ACTION_VIEW, webUri).apply {
+            setPackage("com.whatsapp.w4b")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+    )
+
+    var success = false
+    for (intent in intentsToTry) {
+        try {
+            context.startActivity(intent)
+            success = true
+            break
+        } catch (ignored: Exception) {
+        }
+    }
+
+    if (!success) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("WhatsApp Group Link", trimmedUrl)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(context, "আপনার ফোনে WhatsApp অ্যাপ পাওয়া যায়নি! গ্রুপ লিংক কপি করা হয়েছে।", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, "WhatsApp গ্রুপ লিংক: $trimmedUrl", Toast.LENGTH_LONG).show()
+        }
+    }
+}
+
+fun launchWhatsAppHelpline(context: Context, whatsappNumber: String, userMobile: String) {
+    val cleanNumber = whatsappNumber.replace(Regex("[^0-9]"), "")
+    val formattedNumber = if (cleanNumber.startsWith("0")) "88$cleanNumber" else if (!cleanNumber.startsWith("88")) "88$cleanNumber" else cleanNumber
+    val msg = "আসসালামু আলাইকুম, গার্মেন্টস হিরো অ্যাপ সংক্রান্ত তথ্যের জন্য যোগাযোগ করছি। আমার মোবাইল নম্বর: $userMobile"
+    val encodedMsg = Uri.encode(msg)
+
+    val waDeepLinkUri = Uri.parse("whatsapp://send?phone=$formattedNumber&text=$encodedMsg")
+    val webUri = Uri.parse("https://api.whatsapp.com/send?phone=$formattedNumber&text=$encodedMsg")
+
+    val intentsToTry = listOf(
+        Intent(Intent.ACTION_VIEW, waDeepLinkUri).apply {
+            setPackage("com.whatsapp")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+        Intent(Intent.ACTION_VIEW, waDeepLinkUri).apply {
+            setPackage("com.whatsapp.w4b")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+        Intent(Intent.ACTION_VIEW, waDeepLinkUri).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+        Intent(Intent.ACTION_VIEW, webUri).apply {
+            setPackage("com.whatsapp")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        },
+        Intent(Intent.ACTION_VIEW, webUri).apply {
+            setPackage("com.whatsapp.w4b")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+    )
+
+    var success = false
+    for (intent in intentsToTry) {
+        try {
+            context.startActivity(intent)
+            success = true
+            break
+        } catch (ignored: Exception) {
+        }
+    }
+
+    if (!success) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("WhatsApp Helpline", whatsappNumber)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(context, "আপনার ফোনে WhatsApp অ্যাপ পাওয়া যায়নি! হেল্পলাইন নম্বর কপি করা হয়েছে: $whatsappNumber", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(context, "WhatsApp হেল্পলাইন নম্বর: $whatsappNumber", Toast.LENGTH_LONG).show()
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAuthApp(viewModel: AuthViewModel) {
@@ -631,6 +739,11 @@ fun UserIncomeDashboard(
     val referredUsers by viewModel.referredUsersList.collectAsState()
     val isSyncingReferrals by viewModel.isSyncingReferrals.collectAsState()
 
+    val currentWhatsapp by viewModel.whatsappNumber.collectAsState()
+    val currentWhatsappGroup by viewModel.whatsappGroupLink.collectAsState()
+    val currentNotice by viewModel.noticeText.collectAsState()
+    val isNoticeActive by viewModel.isNoticeActive.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -676,6 +789,46 @@ fun UserIncomeDashboard(
             }
         }
 
+        // LIVE NOTICE BOARD
+        if (isNoticeActive && currentNotice.isNotBlank()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 14.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1)),
+                border = BorderStroke(1.dp, Color(0xFFFFB300))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Campaign,
+                        contentDescription = "Notice",
+                        tint = Color(0xFFE65100),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "📢 লাইভ নোটিশ বোর্ড",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE65100)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = currentNotice,
+                            fontSize = 12.sp,
+                            color = Color(0xFF3E2723),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+        }
+
         // TOP ROUNDED GOLDEN BORDER HEADER FRAME
         GoldenHeaderFrame(
             user = user,
@@ -685,6 +838,144 @@ fun UserIncomeDashboard(
                 }
             }
         )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // WHATSAPP 24/7 HELPLINE SUPPORT BANNER
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    launchWhatsAppHelpline(context, currentWhatsapp, user.mobile)
+                },
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+            border = BorderStroke(1.5.dp, Color(0xFF25D366))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        color = Color(0xFF25D366),
+                        shape = CircleShape,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Chat,
+                                contentDescription = "WhatsApp",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "💬 ২৪/৭ WhatsApp হেল্পলাইন",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color(0xFF1B5E20)
+                        )
+                        Text(
+                            text = "সরাসরি এডমিনের সাথে চ্যাট করুন ($currentWhatsapp)",
+                            fontSize = 11.sp,
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
+                }
+
+                Surface(
+                    color = Color(0xFF25D366),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "চ্যাট",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // WHATSAPP OFFICIAL COMMUNITY GROUP JOIN CARD
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    launchWhatsAppGroup(context, currentWhatsappGroup)
+                },
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFE0F2F1)),
+            border = BorderStroke(1.5.dp, Color(0xFF00897B))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        color = Color(0xFF00897B),
+                        shape = CircleShape,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Groups,
+                                contentDescription = "WhatsApp Group",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "👥 অফিসিয়াল WhatsApp গ্রুপ",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color(0xFF004D40)
+                        )
+                        Text(
+                            text = "সকল মেম্বারদের সাথে যুক্ত হতে গ্রুপে জয়েন করুন",
+                            fontSize = 11.sp,
+                            color = Color(0xFF00796B)
+                        )
+                    }
+                }
+
+                Surface(
+                    color = Color(0xFF00897B),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "জয়েন",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -2390,8 +2681,18 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
     val users by viewModel.adminUsers.collectAsState()
     val adminLoginAdsCount by viewModel.adminLoginAdsCount.collectAsState()
     val adminLoginAdsRevenue by viewModel.adminLoginAdsRevenue.collectAsState()
+    val currentWhatsapp by viewModel.whatsappNumber.collectAsState()
+    val currentWhatsappGroup by viewModel.whatsappGroupLink.collectAsState()
+    val currentNotice by viewModel.noticeText.collectAsState()
+    val isNoticeActive by viewModel.isNoticeActive.collectAsState()
+    val isUpdatingConfig by viewModel.isUpdatingConfig.collectAsState()
     val isLoading by viewModel.isAdminLoading.collectAsState()
-    var selectedTab by remember { mutableStateOf(0) } // 0: Withdrawals, 1: Users
+    var selectedTab by remember { mutableStateOf(0) } // 0: Withdrawals, 1: Users, 2: App Settings
+
+    var editWhatsapp by remember(currentWhatsapp) { mutableStateOf(currentWhatsapp) }
+    var editWhatsappGroup by remember(currentWhatsappGroup) { mutableStateOf(currentWhatsappGroup) }
+    var editNotice by remember(currentNotice) { mutableStateOf(currentNotice) }
+    var editNoticeActive by remember(isNoticeActive) { mutableStateOf(isNoticeActive) }
 
     Column(
         modifier = Modifier
@@ -2419,7 +2720,7 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                         color = Color.White
                     )
                     Text(
-                        text = "মোট ব্যবহারকারী: ${users.size} জন | উইথড্র রিকোয়েস্ট: ${withdrawals.size} টি",
+                        text = "মোট ইউজার: ${users.size} জন | উইথড্র: ${withdrawals.size} টি | হেল্প: $currentWhatsapp",
                         fontSize = 12.sp,
                         color = Color(0xFFFFD700)
                     )
@@ -2519,7 +2820,7 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Tabs: Withdrawal Requests / All Users
+        // Tabs: Withdrawal Requests / All Users / Settings
         TabRow(
             selectedTabIndex = selectedTab,
             containerColor = MaterialTheme.colorScheme.surface,
@@ -2533,9 +2834,9 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                 onClick = { selectedTab = 0 },
                 text = {
                     Text(
-                        text = "উইথড্র রিকোয়েস্ট (${withdrawals.size})",
+                        text = "উইথড্র (${withdrawals.size})",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
                     )
                 }
             )
@@ -2544,9 +2845,20 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                 onClick = { selectedTab = 1 },
                 text = {
                     Text(
-                        text = "সকল ইউজার (${users.size})",
+                        text = "ইউজার (${users.size})",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = 12.sp
+                    )
+                }
+            )
+            Tab(
+                selected = selectedTab == 2,
+                onClick = { selectedTab = 2 },
+                text = {
+                    Text(
+                        text = "⚙️ সেটিংস ও নোটিশ",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
                     )
                 }
             )
@@ -2594,7 +2906,7 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                     }
                 }
             }
-        } else {
+        } else if (selectedTab == 1) {
             // All Users List
             if (users.isEmpty()) {
                 Box(
@@ -2614,6 +2926,155 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                     users.forEach { u ->
                         AdminUserItemCard(user = u)
                         Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
+        } else {
+            // App Settings & Notice Controller Tab
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.SupportAgent,
+                                contentDescription = null,
+                                tint = Color(0xFF25D366),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "💬 WhatsApp হেল্পলাইন নম্বর সেটআপ",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "এখানে যে মোবাইল নম্বর সেট করবেন, ইউজাররা অ্যাপের WhatsApp বাটনে চাপলে সরাসরি সেই নম্বরে চ্যাট চালু হবে।",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedTextField(
+                            value = editWhatsapp,
+                            onValueChange = { editWhatsapp = it },
+                            label = { Text("WhatsApp হেল্প নম্বর") },
+                            placeholder = { Text("01919085229") },
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF25D366)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedTextField(
+                            value = editWhatsappGroup,
+                            onValueChange = { editWhatsappGroup = it },
+                            label = { Text("WhatsApp গ্রুপ লিংক") },
+                            placeholder = { Text("https://chat.whatsapp.com/...") },
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Groups, contentDescription = null, tint = Color(0xFF00897B)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(color = Color.LightGray.copy(alpha = 0.3f))
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Campaign,
+                                contentDescription = null,
+                                tint = Color(0xFFE65100),
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "📢 লাইভ নোটিশ বোর্ড কন্ট্রোল",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "হোমে নোটিশ প্রদর্শন চালু রাখুন:",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Switch(
+                                checked = editNoticeActive,
+                                onCheckedChange = { editNoticeActive = it }
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = editNotice,
+                            onValueChange = { editNotice = it },
+                            label = { Text("নোটিশ বার্তা (Notice Text)") },
+                            placeholder = { Text("জরুরি নোটিশ লিখুন...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            minLines = 3,
+                            maxLines = 5
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Button(
+                            onClick = {
+                                viewModel.updateAdminSettings(
+                                    whatsapp = editWhatsapp.trim(),
+                                    groupLink = editWhatsappGroup.trim(),
+                                    notice = editNotice.trim(),
+                                    isNoticeActive = editNoticeActive
+                                )
+                            },
+                            enabled = !isUpdatingConfig && editWhatsapp.isNotBlank(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF311B92)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            if (isUpdatingConfig) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("ফায়ারবেসে সংরক্ষণ হচ্ছে...")
+                            } else {
+                                Icon(Icons.Default.Save, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("💾 সেটিংস সংরক্ষণ করুন", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
