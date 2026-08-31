@@ -20,7 +20,8 @@ data class User(
     val avatarUrl: String = "",
     val lastCheckInDate: String = "",
     val checkInStreak: Int = 0,
-    val hasEarnedReferralBonus: Boolean = false
+    val hasEarnedReferralBonus: Boolean = false,
+    val earnedReferralWithdrawBonus: Double = 0.0
 ) {
     companion object {
         const val TOTAL_LEVELS = 100000 // ১ লক্ষ লেভেল
@@ -42,7 +43,8 @@ data class WithdrawalRequest(
     val requestedAt: Long = System.currentTimeMillis(),
     val status: String = "PENDING",
     val referredBy: String = "",
-    val hasEarnedReferralBonus: Boolean = false
+    val hasEarnedReferralBonus: Boolean = false,
+    val referralBonusAmount: Double = 0.0
 )
 
 @Keep

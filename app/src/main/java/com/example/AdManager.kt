@@ -8,6 +8,10 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
@@ -47,15 +51,20 @@ object AdManager {
     private const val TAG = "AdManager"
 
     // Production AdMob Ad Unit IDs provided by Admin
+    const val INTERSTITIAL_AD_ID = "ca-app-pub-3015642322344048/9496062662"
     const val REWARDED_INTERSTITIAL_AD_ID = "ca-app-pub-3015642322344048/9496062662"
     const val REWARDED_AD_ID = "ca-app-pub-3015642322344048/8886754239"
     const val BANNER_AD_ID = "ca-app-pub-3015642322344048/5139080914"
 
+    const val TOTAL_LEVEL_ADS = 12
+
     private var isInitialized = false
     private var isGmsAvailable = false
 
+    private var preloadedInterstitial: InterstitialAd? = null
     private var preloadedRewardedInterstitial: RewardedInterstitialAd? = null
     private var preloadedRewarded: RewardedAd? = null
+    private var isLoadingInterstitial = false
     private var isLoadingRewardedInterstitial = false
     private var isLoadingRewarded = false
 
@@ -101,8 +110,39 @@ object AdManager {
     }
 
     fun preloadAds(context: Context) {
+        preloadInterstitial(context)
         preloadRewardedInterstitial(context)
         preloadRewarded(context)
+    }
+
+    private fun preloadInterstitial(context: Context) {
+        if (preloadedInterstitial != null || isLoadingInterstitial) return
+        isLoadingInterstitial = true
+
+        try {
+            val adRequest = createHighEcpmAdRequest()
+            InterstitialAd.load(
+                context,
+                INTERSTITIAL_AD_ID,
+                adRequest,
+                object : InterstitialAdLoadCallback() {
+                    override fun onAdLoaded(ad: InterstitialAd) {
+                        Log.d(TAG, "AdMob InterstitialAd preloaded successfully")
+                        preloadedInterstitial = ad
+                        isLoadingInterstitial = false
+                    }
+
+                    override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                        Log.w(TAG, "InterstitialAd preload failed: ${loadAdError.message} (code: ${loadAdError.code})")
+                        preloadedInterstitial = null
+                        isLoadingInterstitial = false
+                    }
+                }
+            )
+        } catch (e: Throwable) {
+            Log.e(TAG, "Exception during InterstitialAd preload: ${e.message}", e)
+            isLoadingInterstitial = false
+        }
     }
 
     private fun preloadRewardedInterstitial(context: Context) {
@@ -166,12 +206,36 @@ object AdManager {
     }
 
     /**
-     * Show standard AdMob Full Screen Ad (Rewarded Interstitial / Rewarded)
+     * Show standard AdMob Full Screen Ad (Rewarded Interstitial / Rewarded / Interstitial)
      * If already preloaded in memory, it presents instantly.
      * If not available (e.g. fresh install / no fill on test phone), calls onFallback to display rich interactive sponsor ad.
      */
     fun showFullScreenAd(
         activity: Activity,
+        onFallback: () -> Unit,
+        onAdDismissed: () -> Unit
+    ) {
+        showSequentialInterstitialAd(
+            activity = activity,
+            adIndex = 1,
+            totalAds = TOTAL_LEVEL_ADS,
+            onFallback = onFallback,
+            onAdDismissed = onAdDismissed
+        )
+    }
+
+    /**
+     * Requests and shows sequential full-screen interstitial ad with complete AdMob listeners.
+     * AdMob Listener Flow:
+     * - onAdShowedFullScreenContent: Full screen is displayed to the user
+     * - onAdImpression: AdMob server registers official impression
+     * - onAdDismissedFullScreenContent: User finished watching and dismissed the ad -> triggers pipeline preload and proceeds to next queue step
+     * - onAdFailedToShowFullScreenContent: Fallback to high-converting interactive sponsor ad dialog with mandatory countdown
+     */
+    fun showSequentialInterstitialAd(
+        activity: Activity,
+        adIndex: Int,
+        totalAds: Int = TOTAL_LEVEL_ADS,
         onFallback: () -> Unit,
         onAdDismissed: () -> Unit
     ) {
@@ -184,30 +248,69 @@ object AdManager {
             // Ignore if already set
         }
 
-        val cachedInterstitial = preloadedRewardedInterstitial
+        // 1. Check Preloaded Standard Interstitial
+        val cachedInterstitial = preloadedInterstitial
         if (cachedInterstitial != null) {
-            preloadedRewardedInterstitial = null
-            Log.d(TAG, "Presenting preloaded RewardedInterstitialAd")
-            cachedInterstitial.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
+            preloadedInterstitial = null
+            Log.d(TAG, "[Ad $adIndex/$totalAds] Presenting preloaded AdMob InterstitialAd")
+            cachedInterstitial.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdShowedFullScreenContent() {
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] InterstitialAd showed full screen")
+                }
+
+                override fun onAdImpression() {
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] InterstitialAd recorded impression on AdMob")
+                }
+
                 override fun onAdDismissedFullScreenContent() {
-                    Log.d(TAG, "RewardedInterstitialAd dismissed")
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] InterstitialAd dismissed by user")
                     preloadAds(activity.applicationContext)
                     onAdDismissed()
                 }
 
-                override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
-                    Log.e(TAG, "RewardedInterstitialAd failed to show: ${error.message}")
+                override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                    Log.e(TAG, "[Ad $adIndex/$totalAds] InterstitialAd failed to show: ${error.message} (code: ${error.code})")
                     preloadAds(activity.applicationContext)
                     onFallback()
                 }
+            }
+            try {
+                cachedInterstitial.show(activity)
+                return
+            } catch (e: Throwable) {
+                Log.e(TAG, "Exception displaying InterstitialAd: ${e.message}", e)
+            }
+        }
 
+        // 2. Check Preloaded Rewarded Interstitial
+        val cachedRewardedInterstitial = preloadedRewardedInterstitial
+        if (cachedRewardedInterstitial != null) {
+            preloadedRewardedInterstitial = null
+            Log.d(TAG, "[Ad $adIndex/$totalAds] Presenting preloaded RewardedInterstitialAd")
+            cachedRewardedInterstitial.fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdShowedFullScreenContent() {
-                    Log.d(TAG, "RewardedInterstitialAd presented full screen")
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] RewardedInterstitialAd showed full screen")
+                }
+
+                override fun onAdImpression() {
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] RewardedInterstitialAd impression counted")
+                }
+
+                override fun onAdDismissedFullScreenContent() {
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] RewardedInterstitialAd dismissed by user")
+                    preloadAds(activity.applicationContext)
+                    onAdDismissed()
+                }
+
+                override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                    Log.e(TAG, "[Ad $adIndex/$totalAds] RewardedInterstitialAd failed to show: ${error.message}")
+                    preloadAds(activity.applicationContext)
+                    onFallback()
                 }
             }
             try {
-                cachedInterstitial.show(activity) { rewardItem ->
-                    Log.d(TAG, "User earned reward: ${rewardItem.amount} ${rewardItem.type}")
+                cachedRewardedInterstitial.show(activity) { rewardItem ->
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] RewardedInterstitialAd reward earned: ${rewardItem.amount}")
                 }
                 return
             } catch (e: Throwable) {
@@ -215,30 +318,35 @@ object AdManager {
             }
         }
 
+        // 3. Check Preloaded Rewarded Ad
         val cachedRewarded = preloadedRewarded
         if (cachedRewarded != null) {
             preloadedRewarded = null
-            Log.d(TAG, "Presenting preloaded RewardedAd")
-            cachedRewarded.fullScreenContentCallback = object : com.google.android.gms.ads.FullScreenContentCallback() {
+            Log.d(TAG, "[Ad $adIndex/$totalAds] Presenting preloaded RewardedAd")
+            cachedRewarded.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdShowedFullScreenContent() {
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] RewardedAd presented full screen")
+                }
+
+                override fun onAdImpression() {
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] RewardedAd impression logged")
+                }
+
                 override fun onAdDismissedFullScreenContent() {
-                    Log.d(TAG, "RewardedAd dismissed")
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] RewardedAd dismissed")
                     preloadAds(activity.applicationContext)
                     onAdDismissed()
                 }
 
-                override fun onAdFailedToShowFullScreenContent(error: com.google.android.gms.ads.AdError) {
-                    Log.e(TAG, "RewardedAd failed to show: ${error.message}")
+                override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                    Log.e(TAG, "[Ad $adIndex/$totalAds] RewardedAd failed to show: ${error.message}")
                     preloadAds(activity.applicationContext)
                     onFallback()
-                }
-
-                override fun onAdShowedFullScreenContent() {
-                    Log.d(TAG, "RewardedAd presented full screen")
                 }
             }
             try {
                 cachedRewarded.show(activity) { rewardItem ->
-                    Log.d(TAG, "RewardedAd reward earned: ${rewardItem.amount}")
+                    Log.d(TAG, "[Ad $adIndex/$totalAds] RewardedAd reward verified: ${rewardItem.amount}")
                 }
                 return
             } catch (e: Throwable) {
@@ -246,10 +354,59 @@ object AdManager {
             }
         }
 
-        // Neither ad was preloaded in memory: Trigger fallback UI & preload for next slot
-        Log.d(TAG, "No preloaded ad in memory. Triggering fallback interactive ad & starting background fetch.")
-        preloadAds(activity.applicationContext)
-        onFallback()
+        // 4. If nothing in cache, attempt live on-demand fetch with listener before falling back
+        Log.d(TAG, "[Ad $adIndex/$totalAds] Cache empty. Requesting on-demand InterstitialAd from AdMob network...")
+        try {
+            val adRequest = createHighEcpmAdRequest()
+            InterstitialAd.load(
+                activity,
+                INTERSTITIAL_AD_ID,
+                adRequest,
+                object : InterstitialAdLoadCallback() {
+                    override fun onAdLoaded(liveAd: InterstitialAd) {
+                        Log.d(TAG, "[Ad $adIndex/$totalAds] Live on-demand InterstitialAd loaded successfully!")
+                        liveAd.fullScreenContentCallback = object : FullScreenContentCallback() {
+                            override fun onAdShowedFullScreenContent() {
+                                Log.d(TAG, "[Ad $adIndex/$totalAds] Live InterstitialAd showed full screen")
+                            }
+
+                            override fun onAdImpression() {
+                                Log.d(TAG, "[Ad $adIndex/$totalAds] Live InterstitialAd impression confirmed")
+                            }
+
+                            override fun onAdDismissedFullScreenContent() {
+                                Log.d(TAG, "[Ad $adIndex/$totalAds] Live InterstitialAd dismissed")
+                                preloadAds(activity.applicationContext)
+                                onAdDismissed()
+                            }
+
+                            override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                                Log.e(TAG, "[Ad $adIndex/$totalAds] Live InterstitialAd failed to show: ${error.message}")
+                                preloadAds(activity.applicationContext)
+                                onFallback()
+                            }
+                        }
+                        try {
+                            liveAd.show(activity)
+                        } catch (e: Throwable) {
+                            Log.e(TAG, "Exception showing live InterstitialAd: ${e.message}", e)
+                            preloadAds(activity.applicationContext)
+                            onFallback()
+                        }
+                    }
+
+                    override fun onAdFailedToLoad(error: LoadAdError) {
+                        Log.w(TAG, "[Ad $adIndex/$totalAds] On-demand load error: ${error.message} (code: ${error.code}). Using fallback interactive ad.")
+                        preloadAds(activity.applicationContext)
+                        onFallback()
+                    }
+                }
+            )
+        } catch (e: Throwable) {
+            Log.e(TAG, "Exception requesting on-demand ad: ${e.message}", e)
+            preloadAds(activity.applicationContext)
+            onFallback()
+        }
     }
 }
 
@@ -400,34 +557,34 @@ fun AdMobBannerView(modifier: Modifier = Modifier) {
                                     Text(
                                         text = ad.badge,
                                         color = Color(0xFF0F172A),
-                                        fontSize = 9.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Black,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = ad.brand,
                                     color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
                             }
-                            Spacer(modifier = Modifier.height(2.dp))
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = ad.tagline,
                                 color = Color(0xFFF1F5F9),
-                                fontSize = 10.5.sp,
-                                fontWeight = FontWeight.Normal,
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     // Call To Action Button
                     Surface(
@@ -438,9 +595,9 @@ fun AdMobBannerView(modifier: Modifier = Modifier) {
                         Text(
                             text = ad.actionText,
                             color = Color.White,
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                         )
                     }
                 }

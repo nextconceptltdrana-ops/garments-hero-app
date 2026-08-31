@@ -274,16 +274,16 @@ fun GoogleCaptchaDialog(
                                     Column {
                                         Text(
                                             text = "আমি রোবট নই (I'm not a robot)",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF222222)
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = Color(0xFF0F172A)
                                         )
                                         if (isChecked) {
                                             Text(
                                                 text = "ভেরিফিকেশন সফল! এগিয়ে যাচ্ছে...",
-                                                fontSize = 11.sp,
-                                                color = Color(0xFF0F9D58),
-                                                fontWeight = FontWeight.SemiBold
+                                                fontSize = 13.sp,
+                                                color = Color(0xFF1B5E20),
+                                                fontWeight = FontWeight.Bold
                                             )
                                         }
                                     }
@@ -293,19 +293,20 @@ fun GoogleCaptchaDialog(
                                     Icon(
                                         imageVector = Icons.Default.VerifiedUser,
                                         contentDescription = "Security Check",
-                                        tint = Color(0xFF1976D2),
+                                        tint = Color(0xFF1565C0),
                                         modifier = Modifier.size(28.dp)
                                     )
                                     Text(
-                                        text = "Security Check",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.Gray
+                                        text = "reCAPTCHA",
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color(0xFF334155)
                                     )
                                     Text(
                                         text = "Privacy - Terms",
-                                        fontSize = 8.sp,
-                                        color = Color.LightGray
+                                        fontSize = 10.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF64748B)
                                     )
                                 }
                             }
@@ -698,14 +699,14 @@ fun SpinBarDialog(
                             Text(
                                 text = "ভেরিফিকেশন সফল! ✅",
                                 color = Color.White,
-                                fontSize = 11.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = "🎰 লাকি স্পিন বোনাস ড্র (লেভেল #$userLevel)",
                                 color = Color(0xFFFFD700),
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.ExtraBold
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Black
                             )
                         }
                     }
@@ -716,8 +717,9 @@ fun SpinBarDialog(
                 // Spin Bar Options Preview Chips
                 Text(
                     text = "স্পিন হুইল বোনাস ড্র (+১ কয়েন / +২ কয়েন বোনাস):",
-                    fontSize = 11.sp,
-                    color = Color.LightGray,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE2E8F0),
                     textAlign = TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -729,16 +731,16 @@ fun SpinBarDialog(
                     val prizes = listOf("+১ কয়েন (১প)" to Color(0xFF42A5F5), "+২ কয়েন (২প) 🔥" to Color(0xFFFFD700))
                     for ((label, color) in prizes) {
                         Surface(
-                            color = color.copy(alpha = 0.2f),
-                            border = BorderStroke(1.dp, color),
+                            color = color.copy(alpha = 0.25f),
+                            border = BorderStroke(1.5.dp, color),
                             shape = RoundedCornerShape(20.dp)
                         ) {
                             Text(
                                 text = label,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.ExtraBold,
                                 color = color,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                             )
                         }
                     }

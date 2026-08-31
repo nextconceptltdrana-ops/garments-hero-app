@@ -21,6 +21,7 @@ object FirebaseUserManager {
     private const val KEY_LAST_CHECK_IN_DATE = "user_last_check_in_date"
     private const val KEY_CHECK_IN_STREAK = "user_check_in_streak"
     private const val KEY_HAS_EARNED_REFERRAL_BONUS = "user_has_earned_referral_bonus"
+    private const val KEY_EARNED_REFERRAL_WITHDRAW_BONUS = "user_earned_referral_withdraw_bonus"
     private const val KEY_IS_LOGGED_IN = "is_logged_in"
     private const val KEY_UNSYNCED_EARNINGS = "unsynced_earnings_taka"
     private const val KEY_UNSYNCED_COINS = "unsynced_reward_coins"
@@ -192,6 +193,7 @@ object FirebaseUserManager {
         val mobile = snapshot.getString("mobile") ?: snapshot.id.ifEmpty { fallbackMobile }
         val refCount = (snapshot.getLong("referralsCount") ?: 0L).toInt()
         val hasEarnedReferralBonus = snapshot.getBoolean("hasEarnedReferralBonus") ?: false
+        val earnedReferralWithdrawBonus = snapshot.getDouble("earnedReferralWithdrawBonus") ?: (if (hasEarnedReferralBonus) 50.0 else 0.0)
         return User(
             name = snapshot.getString("name") ?: "ব্যবহারকারী",
             mobile = mobile,
@@ -206,7 +208,8 @@ object FirebaseUserManager {
             avatarUrl = snapshot.getString("avatarUrl") ?: "",
             lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
             checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt(),
-            hasEarnedReferralBonus = hasEarnedReferralBonus
+            hasEarnedReferralBonus = hasEarnedReferralBonus,
+            earnedReferralWithdrawBonus = earnedReferralWithdrawBonus
         )
     }
 
@@ -477,7 +480,9 @@ object FirebaseUserManager {
                 "requestedAt" to System.currentTimeMillis(),
                 "status" to "PENDING",
                 "referredBy" to user.referredBy,
-                "hasEarnedReferralBonus" to user.hasEarnedReferralBonus
+                "hasEarnedReferralBonus" to user.hasEarnedReferralBonus,
+                "earnedReferralWithdrawBonus" to user.earnedReferralWithdrawBonus,
+                "referralBonusAmount" to 0.0
             )
 
             firestore.collection("withdrawals")
@@ -519,7 +524,8 @@ object FirebaseUserManager {
                         requestedAt = doc.getLong("requestedAt") ?: System.currentTimeMillis(),
                         status = doc.getString("status") ?: "PENDING",
                         referredBy = doc.getString("referredBy") ?: "",
-                        hasEarnedReferralBonus = doc.getBoolean("hasEarnedReferralBonus") ?: false
+                        hasEarnedReferralBonus = doc.getBoolean("hasEarnedReferralBonus") ?: false,
+                        referralBonusAmount = doc.getDouble("referralBonusAmount") ?: 0.0
                     )
                 }
                 onResult(list.sortedByDescending { it.requestedAt })
@@ -546,6 +552,7 @@ object FirebaseUserManager {
                     val referralsCount = (doc.getLong("referralsCount") ?: 0L).toInt()
                     val avatarUrl = doc.getString("avatarUrl") ?: ""
                     val hasEarnedReferralBonus = doc.getBoolean("hasEarnedReferralBonus") ?: false
+                    val earnedReferralWithdrawBonus = doc.getDouble("earnedReferralWithdrawBonus") ?: (if (hasEarnedReferralBonus) 50.0 else 0.0)
 
                     User(
                         name = if (rawName.isNotBlank()) rawName else "ইউজার ($mobile)",
@@ -559,7 +566,8 @@ object FirebaseUserManager {
                         earningsTaka = earningsTaka,
                         referralsCount = referralsCount,
                         avatarUrl = avatarUrl,
-                        hasEarnedReferralBonus = hasEarnedReferralBonus
+                        hasEarnedReferralBonus = hasEarnedReferralBonus,
+                        earnedReferralWithdrawBonus = earnedReferralWithdrawBonus
                     )
                 }
                 onResult(list.sortedByDescending { it.createdAt })
@@ -618,56 +626,91 @@ object FirebaseUserManager {
             val currentStatus = withdrawSnap.getString("status") ?: "PENDING"
 
             if (status == "APPROVED" && currentStatus != "APPROVED") {
-                // Read User Document to verify Referral Bonus conditions
+                // Read User Document to verify if user has a 'referredBy' ID and referral bonus status
                 val userDocRef = firestore.collection("users").document(userMobile)
                 userDocRef.get().addOnSuccessListener { userSnap ->
                     val referredBy = (userSnap.getString("referredBy") ?: withdrawSnap.getString("referredBy") ?: "").trim()
-                    val alreadyClaimedBonus = userSnap.getBoolean("hasEarnedReferralBonus") ?: false
+                    val alreadyClaimedMaxBonus = userSnap.getBoolean("hasEarnedReferralBonus") ?: false
+                    val previousEarnedWithdrawBonus = userSnap.getDouble("earnedReferralWithdrawBonus") ?: (if (alreadyClaimedMaxBonus) 50.0 else 0.0)
 
-                    // Automatic Verification:
-                    // 1) Withdrawal Amount is >= 500 Taka (৳৫০০ বা তার বেশি)
-                    // 2) User has a valid referrer (referredBy is not empty)
-                    // 3) Referrer has NOT earned the 50 Taka withdrawal bonus for this user before (hasEarnedReferralBonus == false)
-                    if (amountTaka >= 500.0 && referredBy.isNotEmpty() && !alreadyClaimedBonus) {
+                    // Verify if user has a valid 'referredBy' ID and hasn't exhausted the 50 points bonus limit
+                    if (referredBy.isNotEmpty() && !alreadyClaimedMaxBonus) {
                         findReferrerRef(referredBy) { referrerRef ->
                             if (referrerRef != null) {
-                                // Execute Atomic Transaction to credit 50 Taka and lock bonus
+                                // Firestore Transaction mechanism to ensure atomic bonus crediting and flag update
                                 firestore.runTransaction { transaction ->
-                                    // 1. Credit 50 Taka (5000 Coins) to Referrer
-                                    transaction.update(
-                                        referrerRef,
-                                        mapOf(
-                                            "earningsTaka" to com.google.firebase.firestore.FieldValue.increment(50.0),
-                                            "rewardCoins" to com.google.firebase.firestore.FieldValue.increment(5000)
+                                    // 1. Transactional Reads first (mandatory in Firestore transactions)
+                                    val freshUserSnap = transaction.get(userDocRef)
+                                    val freshReferrerSnap = transaction.get(referrerRef)
+                                    val freshWithdrawSnap = transaction.get(withdrawDocRef)
+
+                                    val isBonusAlreadyAwarded = freshUserSnap.getBoolean("hasEarnedReferralBonus") ?: false
+                                    val currentEarnedBonus = freshUserSnap.getDouble("earnedReferralWithdrawBonus") ?: (if (isBonusAlreadyAwarded) 50.0 else 0.0)
+
+                                    if (!isBonusAlreadyAwarded && currentEarnedBonus < 50.0) {
+                                        // Calculate bonus: For 500-point withdrawal or proportional 10%, capped at 50 points
+                                        val remainingBonusCap = (50.0 - currentEarnedBonus).coerceAtLeast(0.0)
+                                        val calculatedBonus = if (amountTaka >= 500.0) 50.0 else (amountTaka * 0.10)
+                                        val bonusToGrant = calculatedBonus.coerceAtMost(remainingBonusCap)
+                                        val coinsToGrant = (bonusToGrant * 100).toLong() // 50 points = 5000 coins
+                                        val newTotalEarnedBonus = currentEarnedBonus + bonusToGrant
+                                        val isCapReached = (newTotalEarnedBonus >= 50.0 || amountTaka >= 500.0)
+
+                                        // 2. Transactional Writes
+                                        // Grant 50 points / balance to Referrer
+                                        val currentRefTaka = freshReferrerSnap.getDouble("earningsTaka") ?: 0.0
+                                        val currentRefCoins = freshReferrerSnap.getLong("rewardCoins") ?: 0L
+                                        transaction.update(
+                                            referrerRef,
+                                            mapOf(
+                                                "earningsTaka" to (currentRefTaka + bonusToGrant),
+                                                "rewardCoins" to (currentRefCoins + coinsToGrant)
+                                            )
                                         )
-                                    )
-                                    // 2. Lock bonus on User document (One-Time Locking)
-                                    transaction.update(
-                                        userDocRef,
-                                        mapOf(
-                                            "hasEarnedReferralBonus" to true
+
+                                        // Ensure 'hasEarnedReferralBonus' flag is set to true on the User document
+                                        transaction.update(
+                                            userDocRef,
+                                            mapOf(
+                                                "earnedReferralWithdrawBonus" to newTotalEarnedBonus,
+                                                "hasEarnedReferralBonus" to isCapReached
+                                            )
                                         )
-                                    )
-                                    // 3. Update Withdrawal Document
-                                    transaction.update(
-                                        withdrawDocRef,
-                                        mapOf(
-                                            "status" to "APPROVED",
-                                            "hasEarnedReferralBonus" to true,
-                                            "referralBonusGranted" to true,
-                                            "referralBonusAmount" to 50.0,
-                                            "approvedAt" to System.currentTimeMillis()
+
+                                        // Update Withdrawal Document with approval and bonus details
+                                        transaction.update(
+                                            withdrawDocRef,
+                                            mapOf(
+                                                "status" to "APPROVED",
+                                                "hasEarnedReferralBonus" to isCapReached,
+                                                "referralBonusGranted" to (bonusToGrant > 0.0),
+                                                "referralBonusAmount" to bonusToGrant,
+                                                "approvedAt" to System.currentTimeMillis()
+                                            )
                                         )
-                                    )
+                                    } else {
+                                        // Already awarded previously, approve withdrawal without duplicate bonus
+                                        transaction.update(
+                                            withdrawDocRef,
+                                            mapOf(
+                                                "status" to "APPROVED",
+                                                "hasEarnedReferralBonus" to true,
+                                                "approvedAt" to System.currentTimeMillis()
+                                            )
+                                        )
+                                    }
                                 }.addOnSuccessListener {
-                                    Log.d(TAG, "50 Taka Referral Bonus successfully credited to referrer $referredBy for user $userMobile's ৳500 withdrawal approval!")
+                                    Log.d(TAG, "Referral Bonus transaction completed for user $userMobile (referred by $referredBy)!")
+
+                                    val bonusAwarded = if (amountTaka >= 500.0) 50.0 else (amountTaka * 0.10).coerceAtMost(50.0)
+                                    val coinsAwarded = (bonusAwarded * 100).toLong()
 
                                     // Add Notification & Transaction Record for Referrer
                                     val referrerNotification = mapOf(
                                         "userMobile" to referrerRef.id,
-                                        "title" to "🎉 ৫০ টাকা রেফারেল উইথড্র বোনাস!",
-                                        "message" to "আপনার রেফারকৃত বন্ধু $userName ($userMobile) এর প্রথম ৳৫০০ উইথড্র অনুমোদিত হয়েছে। আপনার অ্যাকাউন্টে ৫০ টাকা (৫,০০০ কয়েন) যোগ করা হয়েছে!",
-                                        "amountTaka" to 50.0,
+                                        "title" to "🎉 ৫০ পয়েন্ট রেফারেল উইথড্র বোনাস!",
+                                        "message" to "আপনার রেফারকৃত বন্ধু $userName ($userMobile) এর ৳${String.format(java.util.Locale.US, "%.2f", amountTaka)} উইথড্র সফল হয়েছে। রেফারেল বোনাস হিসেবে আপনার অ্যাকাউন্টে ৫০ পয়েন্ট (৳${String.format(java.util.Locale.US, "%.2f", bonusAwarded)}) জমা হয়েছে!",
+                                        "amountTaka" to bonusAwarded,
                                         "type" to "REFERRAL_BONUS",
                                         "timestamp" to System.currentTimeMillis(),
                                         "isRead" to false
@@ -688,24 +731,35 @@ object FirebaseUserManager {
 
                                     onResult(true)
                                 }.addOnFailureListener { e ->
-                                    Log.e(TAG, "Transaction error in 50 Taka referral bonus: ${e.message}")
+                                    Log.e(TAG, "Transaction error in referral bonus: ${e.message}")
                                     // Fallback approve without failing entire withdrawal
-                                    withdrawDocRef.update("status", "APPROVED")
-                                        .addOnSuccessListener { onResult(true) }
-                                        .addOnFailureListener { onResult(false) }
+                                    withdrawDocRef.update(
+                                        mapOf(
+                                            "status" to "APPROVED",
+                                            "approvedAt" to System.currentTimeMillis()
+                                        )
+                                    ).addOnSuccessListener { onResult(true) }
+                                     .addOnFailureListener { onResult(false) }
                                 }
                             } else {
                                 // Referrer profile not found, standard approval
-                                withdrawDocRef.update("status", "APPROVED")
-                                    .addOnSuccessListener { onResult(true) }
-                                    .addOnFailureListener { onResult(false) }
+                                withdrawDocRef.update(
+                                    mapOf(
+                                        "status" to "APPROVED",
+                                        "approvedAt" to System.currentTimeMillis()
+                                    )
+                                ).addOnSuccessListener { onResult(true) }
+                                 .addOnFailureListener { onResult(false) }
                             }
                         }
                     } else {
-                        // Standard Approval without Referral Bonus (e.g. amount < 500, no referrer, or already earned bonus previously)
+                        // Standard Approval without Referral Bonus (no referrer ID or already earned bonus previously)
                         withdrawDocRef.update(
                             mapOf(
                                 "status" to "APPROVED",
+                                "hasEarnedReferralBonus" to alreadyClaimedMaxBonus,
+                                "referralBonusGranted" to false,
+                                "referralBonusAmount" to 0.0,
                                 "approvedAt" to System.currentTimeMillis()
                             )
                         ).addOnSuccessListener {
@@ -1041,6 +1095,7 @@ object FirebaseUserManager {
             .putString(KEY_LAST_CHECK_IN_DATE, user.lastCheckInDate)
             .putInt(KEY_CHECK_IN_STREAK, user.checkInStreak)
             .putBoolean(KEY_HAS_EARNED_REFERRAL_BONUS, user.hasEarnedReferralBonus)
+            .putFloat(KEY_EARNED_REFERRAL_WITHDRAW_BONUS, user.earnedReferralWithdrawBonus.toFloat())
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .apply()
     }
@@ -1066,6 +1121,7 @@ object FirebaseUserManager {
         val lastCheckInDate = prefs.getString(KEY_LAST_CHECK_IN_DATE, "") ?: ""
         val checkInStreak = prefs.getInt(KEY_CHECK_IN_STREAK, 0)
         val hasEarnedReferralBonus = prefs.getBoolean(KEY_HAS_EARNED_REFERRAL_BONUS, false)
+        val earnedReferralWithdrawBonus = prefs.getFloat(KEY_EARNED_REFERRAL_WITHDRAW_BONUS, if (hasEarnedReferralBonus) 50.0f else 0.0f).toDouble()
 
         return User(
             name = name,
@@ -1081,7 +1137,8 @@ object FirebaseUserManager {
             avatarUrl = avatarUrl,
             lastCheckInDate = lastCheckInDate,
             checkInStreak = checkInStreak,
-            hasEarnedReferralBonus = hasEarnedReferralBonus
+            hasEarnedReferralBonus = hasEarnedReferralBonus,
+            earnedReferralWithdrawBonus = earnedReferralWithdrawBonus
         )
     }
 

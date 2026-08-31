@@ -205,13 +205,14 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                     ) {
                         Text(
                             text = if (isAdminMode) "গার্মেন্টস হিরো এডমিন প্যানেল" else "গার্মেন্টস হিরো - গেম ও রিওয়ার্ডস",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 19.sp
                         )
                         Text(
                             text = if (isAdminMode) "এডমিন এক্সেস মোড - সকল ব্যবহারকারী ও উইথড্র" else "ফায়ারবেস রিয়েলটাইম লেভেল ও রিওয়ার্ড সিস্টেম",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                 },
@@ -230,26 +231,26 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                         }
                     } else {
                         Surface(
-                            color = Color(0xFF4CAF50),
+                            color = Color(0xFF2E7D32),
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier.padding(end = 12.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.CloudDone,
                                     contentDescription = "Firebase Connected",
                                     tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
-                                Spacer(modifier = Modifier.width(4.dp))
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
                                     text = "Firebase Active",
                                     color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.ExtraBold
                                 )
                             }
                         }
@@ -736,6 +737,7 @@ fun UserIncomeDashboard(
     val levelCompletionData by viewModel.levelCompletionData.collectAsState()
     val checkInResultData by viewModel.checkInResultData.collectAsState()
     val isClaimingCheckIn by viewModel.isClaimingCheckIn.collectAsState()
+    val adQueueProgress by viewModel.adQueueProgress.collectAsState()
     val referredUsers by viewModel.referredUsersList.collectAsState()
     val isSyncingReferrals by viewModel.isSyncingReferrals.collectAsState()
 
@@ -759,32 +761,66 @@ fun UserIncomeDashboard(
                     .fillMaxWidth()
                     .padding(bottom = 12.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (isFlowBusy) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (isFlowBusy) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                        }
+                        Text(
+                            text = adStatusMessage!!,
                             color = Color.White,
-                            strokeWidth = 2.dp
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
                     }
-                    Text(
-                        text = adStatusMessage!!,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
+
+                    if (isFlowBusy && adQueueProgress > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "বিজ্ঞাপন কিউ অগ্রগতি: $adQueueProgress/১২",
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "${((adQueueProgress / 12f) * 100).toInt()}%",
+                                color = Color(0xFFFFD700),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { adQueueProgress / 12f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = Color(0xFFFFD700),
+                            trackColor = Color.White.copy(alpha = 0.3f)
+                        )
+                    }
                 }
             }
         }
@@ -1358,9 +1394,9 @@ fun FullScreenInteractiveAdDialog(
                                     Text(
                                         text = currentSponsor.badge,
                                         color = Color(0xFF0F172A),
-                                        fontSize = 10.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Black,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
                                 }
 
@@ -1369,8 +1405,8 @@ fun FullScreenInteractiveAdDialog(
                                 Text(
                                     text = "⭐⭐⭐⭐⭐  ৪.৯ (১২০K+ রিভিউ)",
                                     color = Color(0xFFFFE082),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.ExtraBold
                                 )
                             }
                         }
@@ -1382,7 +1418,7 @@ fun FullScreenInteractiveAdDialog(
                             text = currentSponsor.brand,
                             color = Color.White,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 20.sp,
+                            fontSize = 22.sp,
                             textAlign = TextAlign.Center
                         )
 
@@ -1390,10 +1426,11 @@ fun FullScreenInteractiveAdDialog(
 
                         Text(
                             text = currentSponsor.tagline,
-                            color = Color(0xFFCBD5E1),
-                            fontSize = 13.sp,
+                            color = Color(0xFFE2E8F0),
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center,
-                            lineHeight = 19.sp
+                            lineHeight = 21.sp
                         )
 
                         Spacer(modifier = Modifier.height(14.dp))
@@ -1407,14 +1444,14 @@ fun FullScreenInteractiveAdDialog(
                                 Surface(
                                     color = Color(0xFF0F172A),
                                     shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, Color(0xFF334155))
+                                    border = BorderStroke(1.dp, Color(0xFF475569))
                                 ) {
                                     Text(
                                         text = badgeText,
-                                        color = Color(0xFF94A3B8),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        color = Color(0xFFF1F5F9),
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                                     )
                                 }
                             }
@@ -2143,10 +2180,15 @@ fun UserAccountDetailsCard(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = "আপনার রেফারেল কোড", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            text = "আপনার রেফারেল কোড",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
                         Text(
                             text = user.referralCode,
-                            fontSize = 17.sp,
+                            fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -2203,20 +2245,20 @@ fun UserAccountDetailsCard(
                 color = Color(0xFFFFF8E1),
                 border = BorderStroke(1.dp, Color(0xFFFFB300))
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(modifier = Modifier.padding(12.dp)) {
                     Text(
                         text = "🎁 রেফারেল ডাবল বোনাস অফার:",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.5.sp,
-                        color = Color(0xFFE65100)
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 14.sp,
+                        color = Color(0xFFC25E00)
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "১. রেফারেল কোড দিয়ে সাইনআপ করলেই তাৎক্ষণিক ৳৫.০০ বোনাস।\n২. আপনার রেফার করা বন্ধু প্রথমবার ৫০০ টাকা উইথড্র করলে আপনি পাবেন আরও ৳৫০.০০ বোনাস!",
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color(0xFF5D4037),
-                        lineHeight = 16.sp
+                        text = "১. রেফারেল কোড দিয়ে সাইনআপ করলেই তাৎক্ষণিক ৳৫.০০ বোনাস।\n২. আপনার রেফার করা বন্ধু উইথড্র করলেই ১০% হারে পাবেন বোনাস (প্রতি ১০০ টাকায় ১০ টাকা, প্রতি রেফারে মোট সর্বোচ্চ ৫০ টাকা পর্যন্ত)!",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF3E2723),
+                        lineHeight = 18.sp
                     )
                 }
             }
@@ -2227,23 +2269,23 @@ fun UserAccountDetailsCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = 6.dp)
             ) {
                 LinearProgressIndicator(
                     progress = { progress },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp),
+                        .height(9.dp),
                     color = if (refCount >= 3) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.outlineVariant
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
                 )
                 Text(
                     text = if (refCount >= 3) "✅ ৩টি রেফারেল শর্ত পূরণ হয়েছে! আপনি উইথড্র করতে পারবেন।"
                     else "উইথড্র করার যোগ্যতা অর্জন করতে আরও ${3 - refCount} টি রেফারেল প্রয়োজন।",
-                    fontSize = 11.sp,
-                    color = if (refCount >= 3) Color(0xFF2E7D32) else Color.Gray,
-                    fontWeight = if (refCount >= 3) FontWeight.Bold else FontWeight.Normal,
-                    modifier = Modifier.padding(top = 2.dp)
+                    fontSize = 13.sp,
+                    color = if (refCount >= 3) Color(0xFF1B5E20) else Color(0xFF475569),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
 
@@ -2290,8 +2332,10 @@ fun UserAccountDetailsCard(
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
+                                val withdrawBonus = refUser.earnedReferralWithdrawBonus
+                                val totalBonusFromRef = 5.0 + withdrawBonus
                                 Text(
-                                    text = if (refUser.hasEarnedReferralBonus) "+৳৫৫.০০ (৫৳ + ৫০৳ উইথড্র বোনাস)" else "+৳৫.০০",
+                                    text = if (withdrawBonus > 0) "+৳${String.format(Locale.US, "%.2f", totalBonusFromRef)} (৫৳ + ৳${String.format(Locale.US, "%.2f", withdrawBonus)} উইথড্র বোনাস)" else "+৳৫.০০",
                                     fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF2E7D32)
@@ -2952,51 +2996,52 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("💵 মোট বিজ্ঞাপন রাজস্ব (100%):", fontSize = 11.sp, color = Color.White)
+                        Text("💵 মোট রাজস্ব (100%):", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Text(
                             "৳${String.format(Locale.US, "%.2f", grossRevenueTaka)}",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
                             color = Color.White
                         )
                     }
 
                     Column {
-                        Text("👥 ইউজারদের শেয়ার (50%):", fontSize = 11.sp, color = Color(0xFF81C784))
+                        Text("👥 ইউজার শেয়ার (50%):", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF81C784))
                         Text(
                             "৳${String.format(Locale.US, "%.2f", userPayoutTaka)}",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
                             color = Color(0xFF81C784)
                         )
                     }
 
                     Column {
-                        Text("👑 এডমিন নিট লাভ:", fontSize = 11.sp, color = Color(0xFFFFD54F))
+                        Text("👑 এডমিন লাভ:", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFD54F))
                         Text(
                             "৳${String.format(Locale.US, "%.2f", adminProfitTaka)}",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
                             color = Color(0xFFFFD54F)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.2f))
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.25f))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
                     text = "👑 এডমিন এক্সক্লুসিভ লগইন এড: ${adminLoginAdsCount}টি (১০০% এডমিন চ্যানেলে: ৳${String.format(Locale.US, "%.2f", adminLoginAdsRevenue)})",
-                    fontSize = 11.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFFFD700)
                 )
 
                 Text(
                     text = "📈 মোট দেখানো বিজ্ঞাপন ইমপ্রেশন: $totalAdImpressions টি | প্রতি ১০০০ বিজ্ঞাপনে গড়ে $45.00 eCPM",
-                    fontSize = 11.sp,
-                    color = Color.LightGray
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFE2E8F0)
                 )
             }
         }
@@ -3372,15 +3417,18 @@ fun AdminWithdrawalItemCard(
             )
 
             if (item.referredBy.isNotBlank()) {
-                val bonusStatusText = if (item.amountTaka >= 500.0 && !item.hasEarnedReferralBonus) {
-                    "🎉 ৫০০৳ উইথড্র এপ্রুভ করলে রেফারকারী (${item.referredBy}) স্বয়ংক্রিয়ভাবে ৫০ টাকা বোনাস পাবেন!"
+                val potentialBonus = item.amountTaka * 0.10
+                val bonusStatusText = if (item.status == "APPROVED" && item.referralBonusAmount > 0.0) {
+                    "✅ ১০% রেফারেল বোনাস ৳${String.format(Locale.US, "%.2f", item.referralBonusAmount)} রেফারকারী (${item.referredBy}) এর অ্যাকাউন্টে জমা হয়েছে।"
+                } else if (item.status == "PENDING" && !item.hasEarnedReferralBonus) {
+                    "🎉 এপ্রুভ করলে রেফারকারী (${item.referredBy}) ১০% হারে ৳${String.format(Locale.US, "%.2f", potentialBonus)} বোনাস পাবেন (সর্বোচ্চ ৫০৳ লিমিট পর্যন্ত)!"
                 } else if (item.hasEarnedReferralBonus) {
-                    "ℹ️ রেফারেল ৫০৳ বোনাস ইতিমধ্যে পূর্বে প্রদান করা হয়েছে।"
+                    "ℹ️ রেফারেল সর্বোচ্চ ৫০৳ বোনাস লিমিট ইতিমধ্যে সম্পন্ন হয়েছে।"
                 } else {
-                    "ℹ️ উইথড্র ৳৫০০ এর কম হওয়ায় ৫০৳ বোনাস প্রযোজ্য নয়।"
+                    "ℹ️ রেফারকারী: ${item.referredBy}"
                 }
-                val bonusColor = if (item.amountTaka >= 500.0 && !item.hasEarnedReferralBonus) Color(0xFF1B5E20) else Color(0xFFE65100)
-                val bonusBg = if (item.amountTaka >= 500.0 && !item.hasEarnedReferralBonus) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+                val bonusColor = if (item.status == "APPROVED" && item.referralBonusAmount > 0.0 || item.status == "PENDING" && !item.hasEarnedReferralBonus) Color(0xFF1B5E20) else Color(0xFFE65100)
+                val bonusBg = if (item.status == "APPROVED" && item.referralBonusAmount > 0.0 || item.status == "PENDING" && !item.hasEarnedReferralBonus) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
 
                 Spacer(modifier = Modifier.height(4.dp))
                 Surface(
@@ -4032,9 +4080,9 @@ fun DailyCheckInCard(
                         )
                         Text(
                             text = "রিওয়ার্ড অনুপাতে ফুলস্ক্রিন অ্যাড দেখুন",
-                            fontSize = 11.5.sp,
+                            fontSize = 13.sp,
                             color = Color(0xFFFFD700),
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -4043,19 +4091,19 @@ fun DailyCheckInCard(
                 Surface(
                     color = Color(0xFF2E2A48),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.6f))
+                    border = BorderStroke(1.5.dp, Color(0xFFFFD700))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "🔥", fontSize = 14.sp)
+                        Text(text = "🔥", fontSize = 16.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "স্ট্রিক: ${if (isEligible && activeDay == 1 && streak > 0) 0 else streak} দিন",
                             color = Color(0xFFFFD700),
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
                 }
@@ -4093,7 +4141,7 @@ fun DailyCheckInCard(
 
                     Surface(
                         modifier = Modifier
-                            .width(80.dp)
+                            .width(86.dp)
                             .clip(RoundedCornerShape(14.dp)),
                         shape = RoundedCornerShape(14.dp),
                         color = itemBg,
@@ -4105,7 +4153,7 @@ fun DailyCheckInCard(
                         ) {
                             Text(
                                 text = "দিন $day",
-                                fontSize = 11.5.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isCurrentDay) Color(0xFFFFD700) else Color.White
                             )
@@ -4114,38 +4162,38 @@ fun DailyCheckInCard(
 
                             Text(
                                 text = if (day == 7) "🎁" else if (isClaimed) "✅" else "🪙",
-                                fontSize = 20.sp
+                                fontSize = 22.sp
                             )
 
                             Spacer(modifier = Modifier.height(4.dp))
 
                             Text(
                                 text = "+$coins",
-                                fontSize = 13.sp,
+                                fontSize = 14.5.sp,
                                 fontWeight = FontWeight.Black,
                                 color = if (isClaimed) Color(0xFF4ADE80) else Color(0xFFFFD700)
                             )
                             Text(
                                 text = "৳${String.format(Locale.US, "%.2f", taka)}",
-                                fontSize = 11.5.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFE2E8F0)
+                                color = Color(0xFFF1F5F9)
                             )
 
                             Spacer(modifier = Modifier.height(4.dp))
 
                             // Proportional Full-screen Ad indicator
                             Surface(
-                                color = if (isClaimed) Color(0xFF2E7D32).copy(alpha = 0.6f) else Color(0xFF1F2937),
+                                color = if (isClaimed) Color(0xFF2E7D32) else Color(0xFF1F2937),
                                 shape = RoundedCornerShape(6.dp),
-                                border = BorderStroke(0.5.dp, if (isCurrentDay) Color(0xFFFFD700) else Color.Gray.copy(alpha = 0.5f))
+                                border = BorderStroke(0.8.dp, if (isCurrentDay) Color(0xFFFFD700) else Color(0xFF475569))
                             ) {
                                 Text(
                                     text = if (isClaimed) "দেখা শেষ" else "📺 $requiredAds অ্যাড",
-                                    fontSize = 10.5.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isClaimed) Color(0xFF81C784) else if (isCurrentDay) Color(0xFFFFD700) else Color.White,
-                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                    color = if (isClaimed) Color(0xFFB9F6CA) else if (isCurrentDay) Color(0xFFFFD700) else Color.White,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
 
@@ -4157,10 +4205,10 @@ fun DailyCheckInCard(
                                 ) {
                                     Text(
                                         text = "আজকের",
-                                        fontSize = 10.sp,
+                                        fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Black,
                                         color = Color(0xFF1E1C30),
-                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
                             }
