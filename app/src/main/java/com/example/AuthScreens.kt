@@ -813,16 +813,17 @@ fun UserIncomeDashboard(
                     Column {
                         Text(
                             text = "📢 লাইভ নোটিশ বোর্ড",
-                            fontSize = 13.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFE65100)
+                            color = Color(0xFFB45309)
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = currentNotice,
-                            fontSize = 12.sp,
-                            color = Color(0xFF3E2723),
-                            lineHeight = 16.sp
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1F2937),
+                            lineHeight = 18.sp
                         )
                     }
                 }
@@ -882,13 +883,14 @@ fun UserIncomeDashboard(
                         Text(
                             text = "💬 ২৪/৭ WhatsApp হেল্পলাইন",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = Color(0xFF1B5E20)
+                            fontSize = 14.sp,
+                            color = Color(0xFF14532D)
                         )
                         Text(
                             text = "সরাসরি এডমিনের সাথে চ্যাট করুন ($currentWhatsapp)",
-                            fontSize = 11.sp,
-                            color = Color(0xFF2E7D32)
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF166534)
                         )
                     }
                 }
@@ -901,7 +903,7 @@ fun UserIncomeDashboard(
                         text = "চ্যাট",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -951,13 +953,14 @@ fun UserIncomeDashboard(
                         Text(
                             text = "👥 অফিসিয়াল WhatsApp গ্রুপ",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = Color(0xFF004D40)
+                            fontSize = 14.sp,
+                            color = Color(0xFF115E59)
                         )
                         Text(
                             text = "সকল মেম্বারদের সাথে যুক্ত হতে গ্রুপে জয়েন করুন",
-                            fontSize = 11.sp,
-                            color = Color(0xFF00796B)
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF0F766E)
                         )
                     }
                 }
@@ -970,7 +973,7 @@ fun UserIncomeDashboard(
                         text = "জয়েন",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
                 }
@@ -1122,47 +1125,47 @@ fun FullScreenInteractiveAdDialog(
         listOf(
             SponsoredBannerData(
                 brand = "Daraz Online Shopping",
-                tagline = "মেগা ডিসকাউন্ট অফার! ৫০% পর্যন্ত ছাড় + ফ্রি ডেলিভারি",
-                actionText = "শপ করুন",
+                tagline = "মেগা ডিসকাউন্ট অফার! ৫০% পর্যন্ত ছাড় + ফ্রি হোম ডেলিভারি। আজই সেরা ডিল উপভোগ করুন!",
+                actionText = "অফারটি দেখুন",
                 badge = "OFFICIAL SPONSOR",
                 iconEmoji = "🛍️",
-                bgGradient = listOf(Color(0xFF881337), Color(0xFF4C0519)),
+                bgGradient = listOf(Color(0xFF991B1B), Color(0xFF4C0519), Color(0xFF1E1B4B)),
                 btnColor = Color(0xFFF43F5E)
             ),
             SponsoredBannerData(
                 brand = "bKash Digital Payment",
-                tagline = "অ্যাপ দিয়ে পেমেন্টে পাবেন ইনস্ট্যান্ট ২০% ক্যাশব্যাক ও সেন্ড মানি বোনাস!",
+                tagline = "বিকাশ অ্যাপ দিয়ে পেমেন্টে পাবেন ইনস্ট্যান্ট ২০% পর্যন্ত ক্যাশব্যাক ও আকর্ষণীয় রিওয়ার্ড পয়েন্ট!",
                 actionText = "ক্যাশব্যাক নিন",
                 badge = "FEATURED PARTNER",
                 iconEmoji = "💳",
-                bgGradient = listOf(Color(0xFF831843), Color(0xFF1E1B4B)),
+                bgGradient = listOf(Color(0xFF831843), Color(0xFF3B0764), Color(0xFF0F172A)),
                 btnColor = Color(0xFFE11D48)
             ),
             SponsoredBannerData(
                 brand = "Binance Crypto Exchange",
-                tagline = "ট্রেড করুন বিশ্বের সেরা প্ল্যাটফর্মে, জিরো ফিতে আজই একাউন্ট খুলুন",
-                actionText = "ট্রেড করুন",
-                badge = "PROMO AD",
+                tagline = "বিশ্বের এক নম্বর সিকিউর এক্সচেঞ্জে ট্রেড করুন। জিরো ডিপোজিট ফিতে আজই যুক্ত হোন!",
+                actionText = "ট্রেড শুরু করুন",
+                badge = "GLOBAL PROMO",
                 iconEmoji = "📈",
-                bgGradient = listOf(Color(0xFF451A03), Color(0xFF1C1917)),
+                bgGradient = listOf(Color(0xFF78350F), Color(0xFF451A03), Color(0xFF18181B)),
                 btnColor = Color(0xFFF59E0B)
             ),
             SponsoredBannerData(
                 brand = "Samsung Galaxy S24 Ultra",
-                tagline = "Galaxy AI এর সাথে স্মার্টফোনের ভবিষ্যৎ আজই উপভোগ করুন",
-                actionText = "অর্ডার করুন",
+                tagline = "Galaxy AI এর সাথে স্মার্টফোনের ভবিষ্যৎ ও অবিশ্বাস্য ক্যামেরা কোয়ালিটি উপভোগ করুন!",
+                actionText = "ডিভাইস দেখুন",
                 badge = "PREMIUM BRAND",
                 iconEmoji = "📱",
-                bgGradient = listOf(Color(0xFF0C4A6E), Color(0xFF082F49)),
+                bgGradient = listOf(Color(0xFF075985), Color(0xFF0C4A6E), Color(0xFF0F172A)),
                 btnColor = Color(0xFF0284C7)
             ),
             SponsoredBannerData(
-                brand = "Foodpanda Delivery",
-                tagline = "প্রথম অর্ডারে পান ৫০% ছাড় ও ৩০ মিনিটে এক্সপ্রেস ডেলিভারি!",
+                brand = "Foodpanda Express Delivery",
+                tagline = "প্রথম অর্ডারে পান ৫০% পর্যন্ত স্পেশাল ডিসকাউন্ট ও ৩০ মিনিটে গরম খাবার হোম ডেলিভারি!",
                 actionText = "অর্ডার দিন",
-                badge = "HOT DEAL",
+                badge = "SUPER DEAL",
                 iconEmoji = "🍕",
-                bgGradient = listOf(Color(0xFF881337), Color(0xFF4C0519)),
+                bgGradient = listOf(Color(0xFF9F1239), Color(0xFF701A75), Color(0xFF1E1B4B)),
                 btnColor = Color(0xFFEC4899)
             )
         )
@@ -1194,140 +1197,290 @@ fun FullScreenInteractiveAdDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0A0F1D))
-                .padding(20.dp),
-            contentAlignment = Alignment.Center
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF0B0F19),
+                            Color(0xFF111827),
+                            Color(0xFF0A0E17)
+                        )
+                    )
+                )
+                .systemBarsPadding()
         ) {
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF131E35)),
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.5.dp, Color(0xFFFFD700)),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Top Navigation / Header Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Top Ad Header Bar
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            color = Color(0xFFFFD700).copy(alpha = 0.2f),
+                            color = Color(0xFFFFD700).copy(alpha = 0.15f),
                             shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, Color(0xFFFFD700))
+                            border = BorderStroke(1.dp, Color(0xFFFFD700).copy(alpha = 0.6f))
                         ) {
-                            Text(
-                                text = "🏆 $adTitle",
-                                color = Color(0xFFFFD700),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-
-                        Surface(
-                            color = if (isReadyToProceed) Color(0xFF10B981) else Color(0xFF3B82F6),
-                            shape = CircleShape
-                        ) {
-                            Text(
-                                text = if (isReadyToProceed) "✓ সম্পন্ন" else "${secondsRemaining}s",
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Black,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "🎬 $adTitle",
+                                    color = Color(0xFFFFD700),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
-
-                    // Sponsor Card Box
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(170.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Brush.verticalGradient(currentSponsor.bgGradient))
-                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Surface(
-                                color = Color.Black.copy(alpha = 0.4f),
-                                shape = CircleShape,
-                                modifier = Modifier.size(54.dp)
+                    // Countdown Timer / Close Button
+                    if (isReadyToProceed) {
+                        Surface(
+                            onClick = onFinished,
+                            color = Color(0xFF10B981),
+                            shape = RoundedCornerShape(20.dp),
+                            shadowElevation = 4.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Text(text = currentSponsor.iconEmoji, fontSize = 28.sp)
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "স্কিপ করুন ✕",
+                                    color = Color.White,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(1.dp, Color(0xFF38BDF8))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    progress = { (5 - secondsRemaining) / 5f },
+                                    modifier = Modifier.size(14.dp),
+                                    color = Color(0xFF38BDF8),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "রিওয়ার্ড: ${secondsRemaining}s",
+                                    color = Color(0xFFE2E8F0),
+                                    fontSize = 12.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Smooth Progress Bar
+                LinearProgressIndicator(
+                    progress = { if (isReadyToProceed) 1f else (5 - secondsRemaining) / 5f },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(2.dp)),
+                    color = if (isReadyToProceed) Color(0xFF10B981) else Color(0xFFFFD700),
+                    trackColor = Color(0xFF334155)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Hero Interactive Sponsor Card
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2235)),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(1.5.dp, Color(0xFFFFD700).copy(alpha = 0.5f))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Visual Brand Hero Banner
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(160.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Brush.verticalGradient(currentSponsor.bgGradient))
+                                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                                .padding(14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Surface(
+                                    color = Color.Black.copy(alpha = 0.4f),
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(56.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(text = currentSponsor.iconEmoji, fontSize = 30.sp)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Surface(
+                                    color = Color(0xFFFFD700),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = currentSponsor.badge,
+                                        color = Color(0xFF0F172A),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text = "⭐⭐⭐⭐⭐  ৪.৯ (১২০K+ রিভিউ)",
+                                    color = Color(0xFFFFE082),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Brand Title & Description
+                        Text(
+                            text = currentSponsor.brand,
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 20.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = currentSponsor.tagline,
+                            color = Color(0xFFCBD5E1),
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.Center,
+                            lineHeight = 19.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Features Highlights Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            listOf("⚡ ইনস্ট্যান্ট রিওয়ার্ড", "🔒 ১০০% সুরক্ষিত", "🎁 স্পেশাল অফার").forEach { badgeText ->
+                                Surface(
+                                    color = Color(0xFF0F172A),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, Color(0xFF334155))
+                                ) {
+                                    Text(
+                                        text = badgeText,
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = currentSponsor.brand,
-                                color = Color.White,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 17.sp,
-                                textAlign = TextAlign.Center
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Text(
-                                text = currentSponsor.tagline,
-                                color = Color(0xFFE2E8F0),
-                                fontSize = 11.5.sp,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 16.sp
-                            )
                         }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Embedded AdMob Live Banner container
+                        AdMobBannerView()
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                    if (!isReadyToProceed) {
+                // Bottom Action & Reward Bar
+                if (!isReadyToProceed) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color(0xFF1E293B),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, Color(0xFF475569))
+                    ) {
                         Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp, horizontal = 16.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(20.dp),
                                 color = Color(0xFFFFD700),
-                                strokeWidth = 2.dp
+                                strokeWidth = 2.5.dp
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = "বিজ্ঞাপন লোড ও ভেরিফাই হচ্ছে ($secondsRemaining সেকেন্ড)...",
-                                color = Color.LightGray,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
+                                text = "বিজ্ঞাপন দেখা হচ্ছে (${formatBanglaNumber(secondsRemaining)} সেকেন্ড বাকি)...",
+                                color = Color(0xFFF1F5F9),
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-                    } else {
-                        Button(
-                            onClick = onFinished,
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                        ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "পুরস্কার গ্রহণ করুন এবং এগিয়ে যান ➔",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
-                        }
+                    }
+                } else {
+                    Button(
+                        onClick = onFinished,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🎉 পুরস্কার সংগ্রহ করুন এবং এগিয়ে যান ➔",
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 15.sp
+                        )
                     }
                 }
             }
@@ -2041,6 +2194,33 @@ fun UserAccountDetailsCard(
                 value = "${user.referralsCount} জন (উইথড্র এর জন্য ৩টি প্রয়োজন)"
             )
 
+            // High-visibility Referral Bonus Info Box
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFFFFF8E1),
+                border = BorderStroke(1.dp, Color(0xFFFFB300))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text(
+                        text = "🎁 রেফারেল ডাবল বোনাস অফার:",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp,
+                        color = Color(0xFFE65100)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "১. রেফারেল কোড দিয়ে সাইনআপ করলেই তাৎক্ষণিক ৳৫.০০ বোনাস।\n২. আপনার রেফার করা বন্ধু প্রথমবার ৫০০ টাকা উইথড্র করলে আপনি পাবেন আরও ৳৫০.০০ বোনাস!",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF5D4037),
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+
             // Show Referral Progress Bar towards 3 referrals
             val refCount = user.referralsCount
             val progress = (refCount / 3f).coerceIn(0f, 1f)
@@ -2089,11 +2269,14 @@ fun UserAccountDetailsCard(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 2.dp),
+                                    .padding(vertical = 3.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.CheckCircle,
                                         contentDescription = null,
@@ -2108,8 +2291,8 @@ fun UserAccountDetailsCard(
                                     )
                                 }
                                 Text(
-                                    text = "+৳৫.০০",
-                                    fontSize = 12.sp,
+                                    text = if (refUser.hasEarnedReferralBonus) "+৳৫৫.০০ (৫৳ + ৫০৳ উইথড্র বোনাস)" else "+৳৫.০০",
+                                    fontSize = 11.5.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color(0xFF2E7D32)
                                 )
@@ -3144,8 +3327,9 @@ fun AdminWithdrawalItemCard(
                         )
                         Text(
                             text = "📅 $dateFormatted",
-                            fontSize = 11.sp,
-                            color = Color.Gray
+                            fontSize = 12.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF475569)
                         )
                     }
                 }
@@ -3157,7 +3341,7 @@ fun AdminWithdrawalItemCard(
                     Text(
                         text = statusText,
                         color = statusColor,
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     )
@@ -3170,21 +3354,49 @@ fun AdminWithdrawalItemCard(
 
             Text(
                 text = "📱 পেমেন্ট নম্বর (${item.paymentMethod}): ${item.paymentNumber}",
-                fontSize = 14.sp,
+                fontSize = 14.5.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.primary
             )
             Text(
                 text = "💰 উইথড্র পরিমাণ: ৳${String.format(Locale.US, "%.2f", item.amountTaka)}",
-                fontSize = 16.sp,
+                fontSize = 16.5.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color(0xFF2E7D32)
             )
             Text(
                 text = "👤 রেজিস্ট্রেশন মোবাইল: ${item.userMobile}",
-                fontSize = 12.sp,
-                color = Color.DarkGray
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF334155)
             )
+
+            if (item.referredBy.isNotBlank()) {
+                val bonusStatusText = if (item.amountTaka >= 500.0 && !item.hasEarnedReferralBonus) {
+                    "🎉 ৫০০৳ উইথড্র এপ্রুভ করলে রেফারকারী (${item.referredBy}) স্বয়ংক্রিয়ভাবে ৫০ টাকা বোনাস পাবেন!"
+                } else if (item.hasEarnedReferralBonus) {
+                    "ℹ️ রেফারেল ৫০৳ বোনাস ইতিমধ্যে পূর্বে প্রদান করা হয়েছে।"
+                } else {
+                    "ℹ️ উইথড্র ৳৫০০ এর কম হওয়ায় ৫০৳ বোনাস প্রযোজ্য নয়।"
+                }
+                val bonusColor = if (item.amountTaka >= 500.0 && !item.hasEarnedReferralBonus) Color(0xFF1B5E20) else Color(0xFFE65100)
+                val bonusBg = if (item.amountTaka >= 500.0 && !item.hasEarnedReferralBonus) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Surface(
+                    color = bonusBg,
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = bonusStatusText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = bonusColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                    )
+                }
+            }
 
             if (item.status == "PENDING") {
                 Spacer(modifier = Modifier.height(10.dp))
@@ -3199,7 +3411,7 @@ fun AdminWithdrawalItemCard(
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                     ) {
-                        Text("বাতিল করুন", fontSize = 12.sp)
+                        Text("বাতিল করুন", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))
@@ -3210,7 +3422,7 @@ fun AdminWithdrawalItemCard(
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                     ) {
-                        Text("অনুমোদন করুন", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("অনুমোদন করুন", fontSize = 12.5.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -3265,19 +3477,21 @@ fun AdminUserItemCard(user: User) {
                 )
                 Text(
                     text = "📱 মোবাইল: ${user.mobile}",
-                    fontSize = 13.sp,
+                    fontSize = 13.5.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = "📅 যোগদানের সময়: $dateFormatted",
-                    fontSize = 11.sp,
-                    color = Color.Gray
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF475569)
                 )
                 Text(
                     text = "🎁 নিজের কোড: ${user.referralCode} | 🤝 যার রেফারে: ${if (user.referredBy.isNotBlank()) user.referredBy else "সরাসরি"}",
-                    fontSize = 12.sp,
-                    color = Color(0xFFE65100)
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFD97706)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -3287,10 +3501,10 @@ fun AdminUserItemCard(user: User) {
                     ) {
                         Text(
                             text = "⭐ লেভেল #${user.currentLevel}",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF311B92),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(6.dp))
@@ -3300,10 +3514,10 @@ fun AdminUserItemCard(user: User) {
                     ) {
                         Text(
                             text = "💰 ব্যালেন্স: ৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
-                            fontSize = 11.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF2E7D32),
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            color = Color(0xFF15803D),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
@@ -3907,17 +4121,18 @@ fun DailyCheckInCard(
 
                             Text(
                                 text = "+$coins",
-                                fontSize = 12.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Black,
                                 color = if (isClaimed) Color(0xFF4ADE80) else Color(0xFFFFD700)
                             )
                             Text(
                                 text = "৳${String.format(Locale.US, "%.2f", taka)}",
-                                fontSize = 10.sp,
-                                color = Color.LightGray
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFE2E8F0)
                             )
 
-                            Spacer(modifier = Modifier.height(3.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
 
                             // Proportional Full-screen Ad indicator
                             Surface(
@@ -3927,10 +4142,10 @@ fun DailyCheckInCard(
                             ) {
                                 Text(
                                     text = if (isClaimed) "দেখা শেষ" else "📺 $requiredAds অ্যাড",
-                                    fontSize = 9.sp,
+                                    fontSize = 10.5.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isClaimed) Color(0xFF81C784) else if (isCurrentDay) Color(0xFFFFD700) else Color.LightGray,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    color = if (isClaimed) Color(0xFF81C784) else if (isCurrentDay) Color(0xFFFFD700) else Color.White,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                 )
                             }
 
@@ -3942,10 +4157,10 @@ fun DailyCheckInCard(
                                 ) {
                                     Text(
                                         text = "আজকের",
-                                        fontSize = 8.5.sp,
+                                        fontSize = 10.sp,
                                         fontWeight = FontWeight.Black,
                                         color = Color(0xFF1E1C30),
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                                     )
                                 }
                             }

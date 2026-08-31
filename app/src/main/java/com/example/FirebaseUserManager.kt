@@ -20,6 +20,7 @@ object FirebaseUserManager {
     private const val KEY_AVATAR_URL = "user_avatar_url"
     private const val KEY_LAST_CHECK_IN_DATE = "user_last_check_in_date"
     private const val KEY_CHECK_IN_STREAK = "user_check_in_streak"
+    private const val KEY_HAS_EARNED_REFERRAL_BONUS = "user_has_earned_referral_bonus"
     private const val KEY_IS_LOGGED_IN = "is_logged_in"
     private const val KEY_UNSYNCED_EARNINGS = "unsynced_earnings_taka"
     private const val KEY_UNSYNCED_COINS = "unsynced_reward_coins"
@@ -116,7 +117,8 @@ object FirebaseUserManager {
                     currentLevel = 1,
                     completedLevels = 0,
                     rewardCoins = 0,
-                    earningsTaka = 0.0
+                    earningsTaka = 0.0,
+                    hasEarnedReferralBonus = false
                 )
 
                 // Save user to Firebase Firestore
@@ -125,7 +127,7 @@ object FirebaseUserManager {
                         saveSession(context, newUser)
                         Log.d(TAG, "User registered successfully in Firestore: $cleanMobile")
 
-                        // Process referral bonus for referrer if code was supplied
+                        // Process initial 5 Taka referral bonus for referrer if code was supplied
                         if (cleanReferral.isNotEmpty()) {
                             firestore.collection("users")
                                 .whereEqualTo("referralCode", cleanReferral)
@@ -178,7 +180,8 @@ object FirebaseUserManager {
                 currentLevel = 1,
                 completedLevels = 0,
                 rewardCoins = 0,
-                earningsTaka = 0.0
+                earningsTaka = 0.0,
+                hasEarnedReferralBonus = false
             )
             saveSession(context, newUser)
             onResult(true, "নিবন্ধন সম্পন্ন হয়েছে!", newUser)
@@ -188,6 +191,7 @@ object FirebaseUserManager {
     fun parseUserFromSnapshot(snapshot: com.google.firebase.firestore.DocumentSnapshot, fallbackMobile: String = ""): User {
         val mobile = snapshot.getString("mobile") ?: snapshot.id.ifEmpty { fallbackMobile }
         val refCount = (snapshot.getLong("referralsCount") ?: 0L).toInt()
+        val hasEarnedReferralBonus = snapshot.getBoolean("hasEarnedReferralBonus") ?: false
         return User(
             name = snapshot.getString("name") ?: "ব্যবহারকারী",
             mobile = mobile,
@@ -201,7 +205,8 @@ object FirebaseUserManager {
             referralsCount = refCount,
             avatarUrl = snapshot.getString("avatarUrl") ?: "",
             lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
-            checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt()
+            checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt(),
+            hasEarnedReferralBonus = hasEarnedReferralBonus
         )
     }
 
@@ -470,7 +475,9 @@ object FirebaseUserManager {
                 "amountTaka" to amountTaka,
                 "rewardCoins" to coinsToDeduct,
                 "requestedAt" to System.currentTimeMillis(),
-                "status" to "PENDING"
+                "status" to "PENDING",
+                "referredBy" to user.referredBy,
+                "hasEarnedReferralBonus" to user.hasEarnedReferralBonus
             )
 
             firestore.collection("withdrawals")
@@ -510,7 +517,9 @@ object FirebaseUserManager {
                         paymentNumber = doc.getString("paymentNumber") ?: "",
                         amountTaka = doc.getDouble("amountTaka") ?: 0.0,
                         requestedAt = doc.getLong("requestedAt") ?: System.currentTimeMillis(),
-                        status = doc.getString("status") ?: "PENDING"
+                        status = doc.getString("status") ?: "PENDING",
+                        referredBy = doc.getString("referredBy") ?: "",
+                        hasEarnedReferralBonus = doc.getBoolean("hasEarnedReferralBonus") ?: false
                     )
                 }
                 onResult(list.sortedByDescending { it.requestedAt })
@@ -536,6 +545,7 @@ object FirebaseUserManager {
                     val earningsTaka = doc.getDouble("earningsTaka") ?: 0.0
                     val referralsCount = (doc.getLong("referralsCount") ?: 0L).toInt()
                     val avatarUrl = doc.getString("avatarUrl") ?: ""
+                    val hasEarnedReferralBonus = doc.getBoolean("hasEarnedReferralBonus") ?: false
 
                     User(
                         name = if (rawName.isNotBlank()) rawName else "ইউজার ($mobile)",
@@ -548,7 +558,8 @@ object FirebaseUserManager {
                         rewardCoins = rewardCoins,
                         earningsTaka = earningsTaka,
                         referralsCount = referralsCount,
-                        avatarUrl = avatarUrl
+                        avatarUrl = avatarUrl,
+                        hasEarnedReferralBonus = hasEarnedReferralBonus
                     )
                 }
                 onResult(list.sortedByDescending { it.createdAt })
@@ -558,14 +569,240 @@ object FirebaseUserManager {
             }
     }
 
-    fun updateWithdrawalStatus(docId: String, status: String, onResult: (Boolean) -> Unit) {
-        firestore.collection("withdrawals").document(docId)
-            .update("status", status)
-            .addOnSuccessListener {
-                onResult(true)
+    private fun findReferrerRef(referrerCodeOrMobile: String, onFound: (com.google.firebase.firestore.DocumentReference?) -> Unit) {
+        val clean = referrerCodeOrMobile.trim()
+        if (clean.isEmpty()) {
+            onFound(null)
+            return
+        }
+
+        firestore.collection("users").whereEqualTo("referralCode", clean.uppercase())
+            .get()
+            .addOnSuccessListener { query ->
+                if (!query.isEmpty) {
+                    onFound(query.documents[0].reference)
+                } else {
+                    // Try direct mobile match
+                    val normalized = normalizeMobile(clean)
+                    val directRef = firestore.collection("users").document(if (normalized.isNotEmpty()) normalized else clean)
+                    directRef.get().addOnSuccessListener { phoneSnap ->
+                        if (phoneSnap.exists()) {
+                            onFound(directRef)
+                        } else {
+                            onFound(null)
+                        }
+                    }.addOnFailureListener {
+                        onFound(null)
+                    }
+                }
             }
             .addOnFailureListener {
+                onFound(null)
+            }
+    }
+
+    fun updateWithdrawalStatus(docId: String, status: String, onResult: (Boolean) -> Unit) {
+        val withdrawDocRef = firestore.collection("withdrawals").document(docId)
+
+        withdrawDocRef.get().addOnSuccessListener { withdrawSnap ->
+            if (!withdrawSnap.exists()) {
                 onResult(false)
+                return@addOnSuccessListener
+            }
+
+            val userMobile = withdrawSnap.getString("userMobile") ?: withdrawSnap.getString("mobile") ?: ""
+            val userName = withdrawSnap.getString("userName") ?: "ইউজার"
+            val amountTaka = withdrawSnap.getDouble("amountTaka") ?: 0.0
+            val paymentMethod = withdrawSnap.getString("paymentMethod") ?: "বিকাশ"
+            val paymentNumber = withdrawSnap.getString("paymentNumber") ?: ""
+            val currentStatus = withdrawSnap.getString("status") ?: "PENDING"
+
+            if (status == "APPROVED" && currentStatus != "APPROVED") {
+                // Read User Document to verify Referral Bonus conditions
+                val userDocRef = firestore.collection("users").document(userMobile)
+                userDocRef.get().addOnSuccessListener { userSnap ->
+                    val referredBy = (userSnap.getString("referredBy") ?: withdrawSnap.getString("referredBy") ?: "").trim()
+                    val alreadyClaimedBonus = userSnap.getBoolean("hasEarnedReferralBonus") ?: false
+
+                    // Automatic Verification:
+                    // 1) Withdrawal Amount is >= 500 Taka (৳৫০০ বা তার বেশি)
+                    // 2) User has a valid referrer (referredBy is not empty)
+                    // 3) Referrer has NOT earned the 50 Taka withdrawal bonus for this user before (hasEarnedReferralBonus == false)
+                    if (amountTaka >= 500.0 && referredBy.isNotEmpty() && !alreadyClaimedBonus) {
+                        findReferrerRef(referredBy) { referrerRef ->
+                            if (referrerRef != null) {
+                                // Execute Atomic Transaction to credit 50 Taka and lock bonus
+                                firestore.runTransaction { transaction ->
+                                    // 1. Credit 50 Taka (5000 Coins) to Referrer
+                                    transaction.update(
+                                        referrerRef,
+                                        mapOf(
+                                            "earningsTaka" to com.google.firebase.firestore.FieldValue.increment(50.0),
+                                            "rewardCoins" to com.google.firebase.firestore.FieldValue.increment(5000)
+                                        )
+                                    )
+                                    // 2. Lock bonus on User document (One-Time Locking)
+                                    transaction.update(
+                                        userDocRef,
+                                        mapOf(
+                                            "hasEarnedReferralBonus" to true
+                                        )
+                                    )
+                                    // 3. Update Withdrawal Document
+                                    transaction.update(
+                                        withdrawDocRef,
+                                        mapOf(
+                                            "status" to "APPROVED",
+                                            "hasEarnedReferralBonus" to true,
+                                            "referralBonusGranted" to true,
+                                            "referralBonusAmount" to 50.0,
+                                            "approvedAt" to System.currentTimeMillis()
+                                        )
+                                    )
+                                }.addOnSuccessListener {
+                                    Log.d(TAG, "50 Taka Referral Bonus successfully credited to referrer $referredBy for user $userMobile's ৳500 withdrawal approval!")
+
+                                    // Add Notification & Transaction Record for Referrer
+                                    val referrerNotification = mapOf(
+                                        "userMobile" to referrerRef.id,
+                                        "title" to "🎉 ৫০ টাকা রেফারেল উইথড্র বোনাস!",
+                                        "message" to "আপনার রেফারকৃত বন্ধু $userName ($userMobile) এর প্রথম ৳৫০০ উইথড্র অনুমোদিত হয়েছে। আপনার অ্যাকাউন্টে ৫০ টাকা (৫,০০০ কয়েন) যোগ করা হয়েছে!",
+                                        "amountTaka" to 50.0,
+                                        "type" to "REFERRAL_BONUS",
+                                        "timestamp" to System.currentTimeMillis(),
+                                        "isRead" to false
+                                    )
+                                    firestore.collection("notifications").add(referrerNotification)
+
+                                    // Add Notification for Withdrawing User
+                                    val userNotification = mapOf(
+                                        "userMobile" to userMobile,
+                                        "title" to "✅ আপনার ৳${String.format(java.util.Locale.US, "%.2f", amountTaka)} উইথড্র সফল হয়েছে!",
+                                        "message" to "আপনার $paymentMethod নম্বর ($paymentNumber)-এ ৳${String.format(java.util.Locale.US, "%.2f", amountTaka)} পেমেন্ট পাঠানো হয়েছে।",
+                                        "amountTaka" to amountTaka,
+                                        "type" to "WITHDRAWAL_SUCCESS",
+                                        "timestamp" to System.currentTimeMillis(),
+                                        "isRead" to false
+                                    )
+                                    firestore.collection("notifications").add(userNotification)
+
+                                    onResult(true)
+                                }.addOnFailureListener { e ->
+                                    Log.e(TAG, "Transaction error in 50 Taka referral bonus: ${e.message}")
+                                    // Fallback approve without failing entire withdrawal
+                                    withdrawDocRef.update("status", "APPROVED")
+                                        .addOnSuccessListener { onResult(true) }
+                                        .addOnFailureListener { onResult(false) }
+                                }
+                            } else {
+                                // Referrer profile not found, standard approval
+                                withdrawDocRef.update("status", "APPROVED")
+                                    .addOnSuccessListener { onResult(true) }
+                                    .addOnFailureListener { onResult(false) }
+                            }
+                        }
+                    } else {
+                        // Standard Approval without Referral Bonus (e.g. amount < 500, no referrer, or already earned bonus previously)
+                        withdrawDocRef.update(
+                            mapOf(
+                                "status" to "APPROVED",
+                                "approvedAt" to System.currentTimeMillis()
+                            )
+                        ).addOnSuccessListener {
+                            // Add Notification for Withdrawing User
+                            val userNotification = mapOf(
+                                "userMobile" to userMobile,
+                                "title" to "✅ আপনার ৳${String.format(java.util.Locale.US, "%.2f", amountTaka)} উইথড্র সফল হয়েছে!",
+                                "message" to "আপনার $paymentMethod নম্বর ($paymentNumber)-এ ৳${String.format(java.util.Locale.US, "%.2f", amountTaka)} পেমেন্ট পাঠানো হয়েছে।",
+                                "amountTaka" to amountTaka,
+                                "type" to "WITHDRAWAL_SUCCESS",
+                                "timestamp" to System.currentTimeMillis(),
+                                "isRead" to false
+                            )
+                            firestore.collection("notifications").add(userNotification)
+                            onResult(true)
+                        }.addOnFailureListener {
+                            onResult(false)
+                        }
+                    }
+                }.addOnFailureListener {
+                    withdrawDocRef.update("status", "APPROVED")
+                        .addOnSuccessListener { onResult(true) }
+                        .addOnFailureListener { onResult(false) }
+                }
+            } else if (status == "REJECTED" && currentStatus != "REJECTED") {
+                // Reject and refund user balance
+                val coinsToRefund = (amountTaka * 100).toLong()
+                firestore.runTransaction { transaction ->
+                    val userDocRef = firestore.collection("users").document(userMobile)
+                    transaction.update(
+                        userDocRef,
+                        mapOf(
+                            "earningsTaka" to com.google.firebase.firestore.FieldValue.increment(amountTaka),
+                            "rewardCoins" to com.google.firebase.firestore.FieldValue.increment(coinsToRefund)
+                        )
+                    )
+                    transaction.update(
+                        withdrawDocRef,
+                        mapOf(
+                            "status" to "REJECTED",
+                            "rejectedAt" to System.currentTimeMillis()
+                        )
+                    )
+                }.addOnSuccessListener {
+                    val userNotification = mapOf(
+                        "userMobile" to userMobile,
+                        "title" to "❌ উইথড্র রিকোয়েস্ট বাতিল করা হয়েছে",
+                        "message" to "আপনার ৳${String.format(java.util.Locale.US, "%.2f", amountTaka)} উইথড্র রিকোয়েস্টটি বাতিল হয়েছে এবং টাকা আপনার মূল অ্যাকাউন্টে ফেরত দেওয়া হয়েছে।",
+                        "amountTaka" to amountTaka,
+                        "type" to "WITHDRAWAL_REJECTED",
+                        "timestamp" to System.currentTimeMillis(),
+                        "isRead" to false
+                    )
+                    firestore.collection("notifications").add(userNotification)
+                    onResult(true)
+                }.addOnFailureListener {
+                    withdrawDocRef.update("status", "REJECTED")
+                        .addOnSuccessListener { onResult(true) }
+                        .addOnFailureListener { onResult(false) }
+                }
+            } else {
+                withdrawDocRef.update("status", status)
+                    .addOnSuccessListener { onResult(true) }
+                    .addOnFailureListener { onResult(false) }
+            }
+        }.addOnFailureListener {
+            onResult(false)
+        }
+    }
+
+    fun fetchUserNotifications(userMobile: String, onResult: (List<AppNotification>) -> Unit) {
+        val cleanMobile = normalizeMobile(userMobile)
+        if (cleanMobile.isEmpty()) {
+            onResult(emptyList())
+            return
+        }
+
+        firestore.collection("notifications")
+            .whereEqualTo("userMobile", cleanMobile)
+            .get()
+            .addOnSuccessListener { querySnapshot ->
+                val list = querySnapshot.documents.map { doc ->
+                    AppNotification(
+                        id = doc.id,
+                        userMobile = doc.getString("userMobile") ?: "",
+                        title = doc.getString("title") ?: "",
+                        message = doc.getString("message") ?: "",
+                        amountTaka = doc.getDouble("amountTaka") ?: 0.0,
+                        type = doc.getString("type") ?: "REFERRAL_BONUS",
+                        timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+                        isRead = doc.getBoolean("isRead") ?: false
+                    )
+                }
+                onResult(list.sortedByDescending { it.timestamp })
+            }
+            .addOnFailureListener {
+                onResult(emptyList())
             }
     }
 
@@ -803,6 +1040,7 @@ object FirebaseUserManager {
             .putString(KEY_AVATAR_URL, user.avatarUrl)
             .putString(KEY_LAST_CHECK_IN_DATE, user.lastCheckInDate)
             .putInt(KEY_CHECK_IN_STREAK, user.checkInStreak)
+            .putBoolean(KEY_HAS_EARNED_REFERRAL_BONUS, user.hasEarnedReferralBonus)
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .apply()
     }
@@ -827,6 +1065,7 @@ object FirebaseUserManager {
         val avatarUrl = prefs.getString(KEY_AVATAR_URL, "") ?: ""
         val lastCheckInDate = prefs.getString(KEY_LAST_CHECK_IN_DATE, "") ?: ""
         val checkInStreak = prefs.getInt(KEY_CHECK_IN_STREAK, 0)
+        val hasEarnedReferralBonus = prefs.getBoolean(KEY_HAS_EARNED_REFERRAL_BONUS, false)
 
         return User(
             name = name,
@@ -841,7 +1080,8 @@ object FirebaseUserManager {
             referralsCount = referralsCount,
             avatarUrl = avatarUrl,
             lastCheckInDate = lastCheckInDate,
-            checkInStreak = checkInStreak
+            checkInStreak = checkInStreak,
+            hasEarnedReferralBonus = hasEarnedReferralBonus
         )
     }
 

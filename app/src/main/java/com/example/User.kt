@@ -19,7 +19,8 @@ data class User(
     val referralsCount: Int = 0,
     val avatarUrl: String = "",
     val lastCheckInDate: String = "",
-    val checkInStreak: Int = 0
+    val checkInStreak: Int = 0,
+    val hasEarnedReferralBonus: Boolean = false
 ) {
     companion object {
         const val TOTAL_LEVELS = 100000 // ১ লক্ষ লেভেল
@@ -39,6 +40,20 @@ data class WithdrawalRequest(
     val paymentNumber: String = "",
     val amountTaka: Double = 0.0,
     val requestedAt: Long = System.currentTimeMillis(),
-    val status: String = "PENDING"
+    val status: String = "PENDING",
+    val referredBy: String = "",
+    val hasEarnedReferralBonus: Boolean = false
+)
+
+@Keep
+data class AppNotification(
+    val id: String = "",
+    val userMobile: String = "",
+    val title: String = "",
+    val message: String = "",
+    val amountTaka: Double = 0.0,
+    val type: String = "REFERRAL_BONUS",
+    val timestamp: Long = System.currentTimeMillis(),
+    val isRead: Boolean = false
 )
 
