@@ -22,6 +22,8 @@ object FirebaseUserManager {
     private const val KEY_CHECK_IN_STREAK = "user_check_in_streak"
     private const val KEY_HAS_EARNED_REFERRAL_BONUS = "user_has_earned_referral_bonus"
     private const val KEY_EARNED_REFERRAL_WITHDRAW_BONUS = "user_earned_referral_withdraw_bonus"
+    private const val KEY_IS_BANNED = "user_is_banned"
+    private const val KEY_BAN_REASON = "user_ban_reason"
     private const val KEY_IS_LOGGED_IN = "is_logged_in"
     private const val KEY_UNSYNCED_EARNINGS = "unsynced_earnings_taka"
     private const val KEY_UNSYNCED_COINS = "unsynced_reward_coins"
@@ -194,14 +196,23 @@ object FirebaseUserManager {
         val refCount = (snapshot.getLong("referralsCount") ?: 0L).toInt()
         val hasEarnedReferralBonus = snapshot.getBoolean("hasEarnedReferralBonus") ?: false
         val earnedReferralWithdrawBonus = snapshot.getDouble("earnedReferralWithdrawBonus") ?: (if (hasEarnedReferralBonus) 50.0 else 0.0)
+        val isBanned = snapshot.getBoolean("isBanned") ?: false
+        val banReason = snapshot.getString("banReason") ?: ""
+        
+        val rawCurrentLevel = (snapshot.getLong("currentLevel") ?: 1L).toInt().coerceAtLeast(1)
+        val rawCompletedLevels = (snapshot.getLong("completedLevels") ?: 0L).toInt().coerceAtLeast(0)
+        // Guaranteed synchronization: active currentLevel is always completedLevels + 1 (or max with stored currentLevel)
+        val effectiveCurrentLevel = maxOf(rawCurrentLevel, rawCompletedLevels + 1)
+        val effectiveCompletedLevels = effectiveCurrentLevel - 1
+
         return User(
             name = snapshot.getString("name") ?: "ব্যবহারকারী",
             mobile = mobile,
             referralCode = snapshot.getString("referralCode") ?: generateReferralCode(mobile),
             referredBy = snapshot.getString("referredBy") ?: "",
             createdAt = snapshot.getLong("createdAt") ?: System.currentTimeMillis(),
-            currentLevel = (snapshot.getLong("currentLevel") ?: 1L).toInt(),
-            completedLevels = (snapshot.getLong("completedLevels") ?: 0L).toInt(),
+            currentLevel = effectiveCurrentLevel,
+            completedLevels = effectiveCompletedLevels,
             rewardCoins = snapshot.getLong("rewardCoins") ?: 0L,
             earningsTaka = snapshot.getDouble("earningsTaka") ?: 0.0,
             referralsCount = refCount,
@@ -209,7 +220,9 @@ object FirebaseUserManager {
             lastCheckInDate = snapshot.getString("lastCheckInDate") ?: "",
             checkInStreak = (snapshot.getLong("checkInStreak") ?: 0L).toInt(),
             hasEarnedReferralBonus = hasEarnedReferralBonus,
-            earnedReferralWithdrawBonus = earnedReferralWithdrawBonus
+            earnedReferralWithdrawBonus = earnedReferralWithdrawBonus,
+            isBanned = isBanned,
+            banReason = banReason
         )
     }
 
@@ -341,8 +354,9 @@ object FirebaseUserManager {
         takaEarned: Double,
         onResult: (updatedUser: User) -> Unit
     ) {
-        val nextLevel = user.currentLevel + 1
-        val updatedCompleted = user.completedLevels + 1
+        val currentActiveLevel = maxOf(user.currentLevel, user.completedLevels + 1)
+        val nextLevel = currentActiveLevel + 1
+        val updatedCompleted = currentActiveLevel
         val updatedCoins = user.rewardCoins + coinsEarned
         val updatedTaka = user.earningsTaka + takaEarned
 
@@ -394,7 +408,10 @@ object FirebaseUserManager {
         val pendingTaka = prefs.getFloat(KEY_UNSYNCED_EARNINGS, 0.0f).toDouble()
         val pendingCoins = prefs.getLong(KEY_UNSYNCED_COINS, 0L)
         val pendingLevels = prefs.getInt(KEY_UNSYNCED_LEVELS, 0)
-        val currentLevel = prefs.getInt(KEY_CURRENT_LEVEL, 1)
+        val storedCurrentLevel = prefs.getInt(KEY_CURRENT_LEVEL, 1)
+        val storedCompletedLevels = prefs.getInt(KEY_COMPLETED_LEVELS, 0)
+        val effectiveCurrentLevel = maxOf(storedCurrentLevel, storedCompletedLevels + 1)
+        val effectiveCompletedLevels = effectiveCurrentLevel - 1
 
         if (pendingTaka <= 0.0 && pendingCoins <= 0L && pendingLevels <= 0) {
             Log.d(TAG, "No pending points to sync. Firestore write quota preserved.")
@@ -402,13 +419,13 @@ object FirebaseUserManager {
             return
         }
 
-        Log.d(TAG, "Syncing batch progress to Firestore for $mobile: +$pendingTaka Taka, +$pendingCoins Coins, +$pendingLevels Levels")
+        Log.d(TAG, "Syncing batch progress to Firestore for $mobile: +$pendingTaka Taka, +$pendingCoins Coins, +$pendingLevels Levels (Current Level: $effectiveCurrentLevel, Completed: $effectiveCompletedLevels)")
 
         val updates = mapOf(
             "earningsTaka" to com.google.firebase.firestore.FieldValue.increment(pendingTaka),
             "rewardCoins" to com.google.firebase.firestore.FieldValue.increment(pendingCoins),
-            "completedLevels" to com.google.firebase.firestore.FieldValue.increment(pendingLevels.toLong()),
-            "currentLevel" to currentLevel
+            "completedLevels" to effectiveCompletedLevels.toLong(),
+            "currentLevel" to effectiveCurrentLevel.toLong()
         )
 
         firestore.collection("users").document(mobile)
@@ -553,6 +570,8 @@ object FirebaseUserManager {
                     val avatarUrl = doc.getString("avatarUrl") ?: ""
                     val hasEarnedReferralBonus = doc.getBoolean("hasEarnedReferralBonus") ?: false
                     val earnedReferralWithdrawBonus = doc.getDouble("earnedReferralWithdrawBonus") ?: (if (hasEarnedReferralBonus) 50.0 else 0.0)
+                    val isBanned = doc.getBoolean("isBanned") ?: false
+                    val banReason = doc.getString("banReason") ?: ""
 
                     User(
                         name = if (rawName.isNotBlank()) rawName else "ইউজার ($mobile)",
@@ -567,7 +586,9 @@ object FirebaseUserManager {
                         referralsCount = referralsCount,
                         avatarUrl = avatarUrl,
                         hasEarnedReferralBonus = hasEarnedReferralBonus,
-                        earnedReferralWithdrawBonus = earnedReferralWithdrawBonus
+                        earnedReferralWithdrawBonus = earnedReferralWithdrawBonus,
+                        isBanned = isBanned,
+                        banReason = banReason
                     )
                 }
                 onResult(list.sortedByDescending { it.createdAt })
@@ -626,91 +647,73 @@ object FirebaseUserManager {
             val currentStatus = withdrawSnap.getString("status") ?: "PENDING"
 
             if (status == "APPROVED" && currentStatus != "APPROVED") {
-                // Read User Document to verify if user has a 'referredBy' ID and referral bonus status
+                // Read User Document to verify if user has a 'referredBy' ID
                 val userDocRef = firestore.collection("users").document(userMobile)
                 userDocRef.get().addOnSuccessListener { userSnap ->
                     val referredBy = (userSnap.getString("referredBy") ?: withdrawSnap.getString("referredBy") ?: "").trim()
-                    val alreadyClaimedMaxBonus = userSnap.getBoolean("hasEarnedReferralBonus") ?: false
-                    val previousEarnedWithdrawBonus = userSnap.getDouble("earnedReferralWithdrawBonus") ?: (if (alreadyClaimedMaxBonus) 50.0 else 0.0)
 
-                    // Verify if user has a valid 'referredBy' ID and hasn't exhausted the 50 points bonus limit
-                    if (referredBy.isNotEmpty() && !alreadyClaimedMaxBonus) {
+                    // Verify if user has a valid 'referredBy' ID for 5% lifetime referral commission
+                    if (referredBy.isNotEmpty()) {
                         findReferrerRef(referredBy) { referrerRef ->
                             if (referrerRef != null) {
-                                // Firestore Transaction mechanism to ensure atomic bonus crediting and flag update
+                                // Firestore Transaction mechanism to ensure atomic 5% lifetime commission crediting
                                 firestore.runTransaction { transaction ->
                                     // 1. Transactional Reads first (mandatory in Firestore transactions)
                                     val freshUserSnap = transaction.get(userDocRef)
                                     val freshReferrerSnap = transaction.get(referrerRef)
                                     val freshWithdrawSnap = transaction.get(withdrawDocRef)
 
-                                    val isBonusAlreadyAwarded = freshUserSnap.getBoolean("hasEarnedReferralBonus") ?: false
-                                    val currentEarnedBonus = freshUserSnap.getDouble("earnedReferralWithdrawBonus") ?: (if (isBonusAlreadyAwarded) 50.0 else 0.0)
+                                    val currentEarnedBonus = freshUserSnap.getDouble("earnedReferralWithdrawBonus") ?: 0.0
 
-                                    if (!isBonusAlreadyAwarded && currentEarnedBonus < 50.0) {
-                                        // Calculate bonus: For 500-point withdrawal or proportional 10%, capped at 50 points
-                                        val remainingBonusCap = (50.0 - currentEarnedBonus).coerceAtLeast(0.0)
-                                        val calculatedBonus = if (amountTaka >= 500.0) 50.0 else (amountTaka * 0.10)
-                                        val bonusToGrant = calculatedBonus.coerceAtMost(remainingBonusCap)
-                                        val coinsToGrant = (bonusToGrant * 100).toLong() // 50 points = 5000 coins
-                                        val newTotalEarnedBonus = currentEarnedBonus + bonusToGrant
-                                        val isCapReached = (newTotalEarnedBonus >= 50.0 || amountTaka >= 500.0)
+                                    // Calculate 5% lifetime referral commission without any maximum cap
+                                    val calculatedCommission = amountTaka * 0.05
+                                    val coinsToGrant = (calculatedCommission * 100).toLong() // 1 Taka = 100 Coins
+                                    val newTotalEarnedBonus = currentEarnedBonus + calculatedCommission
 
-                                        // 2. Transactional Writes
-                                        // Grant 50 points / balance to Referrer
-                                        val currentRefTaka = freshReferrerSnap.getDouble("earningsTaka") ?: 0.0
-                                        val currentRefCoins = freshReferrerSnap.getLong("rewardCoins") ?: 0L
-                                        transaction.update(
-                                            referrerRef,
-                                            mapOf(
-                                                "earningsTaka" to (currentRefTaka + bonusToGrant),
-                                                "rewardCoins" to (currentRefCoins + coinsToGrant)
-                                            )
+                                    // 2. Transactional Writes
+                                    // Grant 5% lifetime commission balance to Referrer
+                                    val currentRefTaka = freshReferrerSnap.getDouble("earningsTaka") ?: 0.0
+                                    val currentRefCoins = freshReferrerSnap.getLong("rewardCoins") ?: 0L
+                                    transaction.update(
+                                        referrerRef,
+                                        mapOf(
+                                            "earningsTaka" to (currentRefTaka + calculatedCommission),
+                                            "rewardCoins" to (currentRefCoins + coinsToGrant)
                                         )
+                                    )
 
-                                        // Ensure 'hasEarnedReferralBonus' flag is set to true on the User document
-                                        transaction.update(
-                                            userDocRef,
-                                            mapOf(
-                                                "earnedReferralWithdrawBonus" to newTotalEarnedBonus,
-                                                "hasEarnedReferralBonus" to isCapReached
-                                            )
+                                    // Update total referral withdraw commission earned on User document
+                                    transaction.update(
+                                        userDocRef,
+                                        mapOf(
+                                            "earnedReferralWithdrawBonus" to newTotalEarnedBonus,
+                                            "hasEarnedReferralBonus" to true
                                         )
+                                    )
 
-                                        // Update Withdrawal Document with approval and bonus details
-                                        transaction.update(
-                                            withdrawDocRef,
-                                            mapOf(
-                                                "status" to "APPROVED",
-                                                "hasEarnedReferralBonus" to isCapReached,
-                                                "referralBonusGranted" to (bonusToGrant > 0.0),
-                                                "referralBonusAmount" to bonusToGrant,
-                                                "approvedAt" to System.currentTimeMillis()
-                                            )
+                                    // Update Withdrawal Document with approval and 5% lifetime commission details
+                                    transaction.update(
+                                        withdrawDocRef,
+                                        mapOf(
+                                            "status" to "APPROVED",
+                                            "hasEarnedReferralBonus" to true,
+                                            "referralBonusGranted" to true,
+                                            "referralBonusAmount" to calculatedCommission,
+                                            "approvedAt" to System.currentTimeMillis()
                                         )
-                                    } else {
-                                        // Already awarded previously, approve withdrawal without duplicate bonus
-                                        transaction.update(
-                                            withdrawDocRef,
-                                            mapOf(
-                                                "status" to "APPROVED",
-                                                "hasEarnedReferralBonus" to true,
-                                                "approvedAt" to System.currentTimeMillis()
-                                            )
-                                        )
-                                    }
+                                    )
                                 }.addOnSuccessListener {
-                                    Log.d(TAG, "Referral Bonus transaction completed for user $userMobile (referred by $referredBy)!")
+                                    Log.d(TAG, "5% Lifetime Referral Commission transaction completed for user $userMobile (referred by $referredBy)!")
 
-                                    val bonusAwarded = if (amountTaka >= 500.0) 50.0 else (amountTaka * 0.10).coerceAtMost(50.0)
-                                    val coinsAwarded = (bonusAwarded * 100).toLong()
+                                    val commissionAwarded = amountTaka * 0.05
+                                    val coinsAwarded = (commissionAwarded * 100).toLong()
 
                                     // Add Notification & Transaction Record for Referrer
                                     val referrerNotification = mapOf(
                                         "userMobile" to referrerRef.id,
-                                        "title" to "🎉 ৫০ পয়েন্ট রেফারেল উইথড্র বোনাস!",
-                                        "message" to "আপনার রেফারকৃত বন্ধু $userName ($userMobile) এর ৳${String.format(java.util.Locale.US, "%.2f", amountTaka)} উইথড্র সফল হয়েছে। রেফারেল বোনাস হিসেবে আপনার অ্যাকাউন্টে ৫০ পয়েন্ট (৳${String.format(java.util.Locale.US, "%.2f", bonusAwarded)}) জমা হয়েছে!",
-                                        "amountTaka" to bonusAwarded,
+                                        "title" to "🎉 ৫% আজীবন রেফারেল কমিশন!",
+                                        "message" to "আপনার রেফারকৃত মেম্বার $userName ($userMobile) এর ৳${String.format(java.util.Locale.US, "%.2f", amountTaka)} উইথড্র সফল হয়েছে। ৫% আজীবন কমিশন হিসেবে আপনার অ্যাকাউন্টে ৳${String.format(java.util.Locale.US, "%.2f", commissionAwarded)} ($coinsAwarded কয়েন) জমা হয়েছে!",
+                                        "amountTaka" to commissionAwarded,
                                         "type" to "REFERRAL_BONUS",
                                         "timestamp" to System.currentTimeMillis(),
                                         "isRead" to false
@@ -731,7 +734,7 @@ object FirebaseUserManager {
 
                                     onResult(true)
                                 }.addOnFailureListener { e ->
-                                    Log.e(TAG, "Transaction error in referral bonus: ${e.message}")
+                                    Log.e(TAG, "Transaction error in 5% referral commission: ${e.message}")
                                     // Fallback approve without failing entire withdrawal
                                     withdrawDocRef.update(
                                         mapOf(
@@ -753,11 +756,11 @@ object FirebaseUserManager {
                             }
                         }
                     } else {
-                        // Standard Approval without Referral Bonus (no referrer ID or already earned bonus previously)
+                        // Standard Approval without Referral Commission (no referrer ID)
                         withdrawDocRef.update(
                             mapOf(
                                 "status" to "APPROVED",
-                                "hasEarnedReferralBonus" to alreadyClaimedMaxBonus,
+                                "hasEarnedReferralBonus" to false,
                                 "referralBonusGranted" to false,
                                 "referralBonusAmount" to 0.0,
                                 "approvedAt" to System.currentTimeMillis()
@@ -1096,6 +1099,8 @@ object FirebaseUserManager {
             .putInt(KEY_CHECK_IN_STREAK, user.checkInStreak)
             .putBoolean(KEY_HAS_EARNED_REFERRAL_BONUS, user.hasEarnedReferralBonus)
             .putFloat(KEY_EARNED_REFERRAL_WITHDRAW_BONUS, user.earnedReferralWithdrawBonus.toFloat())
+            .putBoolean(KEY_IS_BANNED, user.isBanned)
+            .putString(KEY_BAN_REASON, user.banReason)
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .apply()
     }
@@ -1112,8 +1117,11 @@ object FirebaseUserManager {
         val referralCode = prefs.getString(KEY_REFERRAL_CODE, "") ?: generateReferralCode(mobile)
         val referredBy = prefs.getString(KEY_REFERRED_BY, "") ?: ""
         val createdAt = prefs.getLong(KEY_CREATED_AT, System.currentTimeMillis())
-        val currentLevel = prefs.getInt(KEY_CURRENT_LEVEL, 1)
-        val completedLevels = prefs.getInt(KEY_COMPLETED_LEVELS, 0)
+        val storedCurrentLevel = prefs.getInt(KEY_CURRENT_LEVEL, 1).coerceAtLeast(1)
+        val storedCompletedLevels = prefs.getInt(KEY_COMPLETED_LEVELS, 0).coerceAtLeast(0)
+        val effectiveCurrentLevel = maxOf(storedCurrentLevel, storedCompletedLevels + 1)
+        val effectiveCompletedLevels = effectiveCurrentLevel - 1
+
         val rewardCoins = prefs.getLong(KEY_REWARD_COINS, 0L)
         val earningsTaka = prefs.getFloat(KEY_EARNINGS_TAKA, 0.0f).toDouble()
         val referralsCount = prefs.getInt(KEY_REFERRALS_COUNT, 0)
@@ -1122,6 +1130,8 @@ object FirebaseUserManager {
         val checkInStreak = prefs.getInt(KEY_CHECK_IN_STREAK, 0)
         val hasEarnedReferralBonus = prefs.getBoolean(KEY_HAS_EARNED_REFERRAL_BONUS, false)
         val earnedReferralWithdrawBonus = prefs.getFloat(KEY_EARNED_REFERRAL_WITHDRAW_BONUS, if (hasEarnedReferralBonus) 50.0f else 0.0f).toDouble()
+        val isBanned = prefs.getBoolean(KEY_IS_BANNED, false)
+        val banReason = prefs.getString(KEY_BAN_REASON, "") ?: ""
 
         return User(
             name = name,
@@ -1129,8 +1139,8 @@ object FirebaseUserManager {
             referralCode = referralCode,
             referredBy = referredBy,
             createdAt = createdAt,
-            currentLevel = currentLevel,
-            completedLevels = completedLevels,
+            currentLevel = effectiveCurrentLevel,
+            completedLevels = effectiveCompletedLevels,
             rewardCoins = rewardCoins,
             earningsTaka = earningsTaka,
             referralsCount = referralsCount,
@@ -1138,8 +1148,104 @@ object FirebaseUserManager {
             lastCheckInDate = lastCheckInDate,
             checkInStreak = checkInStreak,
             hasEarnedReferralBonus = hasEarnedReferralBonus,
-            earnedReferralWithdrawBonus = earnedReferralWithdrawBonus
+            earnedReferralWithdrawBonus = earnedReferralWithdrawBonus,
+            isBanned = isBanned,
+            banReason = banReason
         )
+    }
+
+    /**
+     * Admin Functionality: Directly update a user's balance, coins, level, name, or referral details
+     */
+    fun adminUpdateUser(
+        userMobile: String,
+        updatedName: String,
+        updatedCurrentLevel: Int,
+        updatedEarningsTaka: Double,
+        updatedRewardCoins: Long,
+        updatedReferralCode: String,
+        updatedReferredBy: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        val cleanMobile = normalizeMobile(userMobile)
+        if (cleanMobile.isEmpty()) {
+            onResult(false, "ইউজারের মোবাইল নম্বর পাওয়া যায়নি।")
+            return
+        }
+
+        val completedLevels = (updatedCurrentLevel - 1).coerceAtLeast(0)
+        val updates = mapOf(
+            "name" to updatedName.trim(),
+            "currentLevel" to updatedCurrentLevel.coerceAtLeast(1),
+            "completedLevels" to completedLevels,
+            "earningsTaka" to updatedEarningsTaka.coerceAtLeast(0.0),
+            "rewardCoins" to updatedRewardCoins.coerceAtLeast(0L),
+            "referralCode" to updatedReferralCode.trim().uppercase(),
+            "referredBy" to updatedReferredBy.trim().uppercase()
+        )
+
+        firestore.collection("users").document(cleanMobile)
+            .set(updates, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                onResult(true, "ইউজারের তথ্য সফলভাবে আপডেট করা হয়েছে!")
+            }
+            .addOnFailureListener { e ->
+                onResult(false, "তথ্য আপডেট করতে সমস্যা: ${e.message}")
+            }
+    }
+
+    /**
+     * Admin Functionality: Ban or Unban a user
+     */
+    fun adminSetUserBanStatus(
+        userMobile: String,
+        isBanned: Boolean,
+        banReason: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        val cleanMobile = normalizeMobile(userMobile)
+        if (cleanMobile.isEmpty()) {
+            onResult(false, "ইউজারের মোবাইল নম্বর পাওয়া যায়নি।")
+            return
+        }
+
+        val updates = mapOf(
+            "isBanned" to isBanned,
+            "banReason" to if (isBanned) banReason.trim().ifEmpty { "নিয়ম লঙ্ঘনের কারণে অ্যাকাউন্ট সাময়িকভাবে স্থগিত করা হয়েছে।" } else ""
+        )
+
+        firestore.collection("users").document(cleanMobile)
+            .set(updates, com.google.firebase.firestore.SetOptions.merge())
+            .addOnSuccessListener {
+                val msg = if (isBanned) "ইউজারকে সফলভাবে ব্যান (Ban) করা হয়েছে।" else "ইউজারের ব্যান তুলে নেওয়া হয়েছে (Unbanned)।"
+                onResult(true, msg)
+            }
+            .addOnFailureListener { e ->
+                onResult(false, "ব্যান স্ট্যাটাস পরিবর্তনে সমস্যা: ${e.message}")
+            }
+    }
+
+    /**
+     * Admin Functionality: Delete a user and associated records completely
+     */
+    fun adminDeleteUser(
+        userMobile: String,
+        onResult: (Boolean, String) -> Unit
+    ) {
+        val cleanMobile = normalizeMobile(userMobile)
+        if (cleanMobile.isEmpty()) {
+            onResult(false, "ইউজারের মোবাইল নম্বর পাওয়া যায়নি।")
+            return
+        }
+
+        firestore.collection("users").document(cleanMobile)
+            .delete()
+            .addOnSuccessListener {
+                onResult(true, "ইউজারকে সফলভাবে ডাটাবেজ থেকে সম্পূর্ণ মুছে ফেলা হয়েছে।")
+            }
+            .addOnFailureListener { e ->
+                onResult(false, "ইউজার মুছে ফেলতে সমস্যা: ${e.message}")
+            }
     }
 
     fun clearSession(context: Context) {

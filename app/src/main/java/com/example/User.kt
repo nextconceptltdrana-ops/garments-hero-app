@@ -21,7 +21,9 @@ data class User(
     val lastCheckInDate: String = "",
     val checkInStreak: Int = 0,
     val hasEarnedReferralBonus: Boolean = false,
-    val earnedReferralWithdrawBonus: Double = 0.0
+    val earnedReferralWithdrawBonus: Double = 0.0,
+    val isBanned: Boolean = false,
+    val banReason: String = ""
 ) {
     companion object {
         const val TOTAL_LEVELS = 100000 // ১ লক্ষ লেভেল

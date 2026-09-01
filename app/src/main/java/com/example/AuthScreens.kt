@@ -184,79 +184,114 @@ fun MainAuthApp(viewModel: AuthViewModel) {
     val showPrivacyPolicyDialog by viewModel.showPrivacyPolicyDialog.collectAsState()
     val showDeleteAccountDialog by viewModel.showDeleteAccountDialog.collectAsState()
     val showFairPlayDialog by viewModel.showFairPlayDialog.collectAsState()
+    val showWelcomeMotivation by viewModel.showWelcomeMotivation.collectAsState()
     val isDeletingAccount by viewModel.isDeletingAccount.collectAsState()
+    val whatsappNumber by viewModel.whatsappNumber.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.checkExistingSession(context)
     }
 
+    LaunchedEffect(currentUser) {
+        if (currentUser != null && !currentUser!!.isBanned && !isAdminMode) {
+            val act = context as? android.app.Activity
+            if (act != null) {
+                viewModel.playStartupOpeningAds(act)
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column(
-                        modifier = Modifier
-                            .clickable(
-                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                                indication = null
-                            ) {
-                                viewModel.onHeaderClicked()
-                            }
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color.Transparent,
+                shadowElevation = 8.dp
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.horizontalGradient(
+                                if (isAdminMode) {
+                                    listOf(Color(0xFF1E1B4B), Color(0xFF311B92), Color(0xFF1E1B4B))
+                                } else {
+                                    listOf(Color(0xFF00382B), Color(0xFF005A44), Color(0xFF00382B))
+                                }
+                            )
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = if (isAdminMode) "গার্মেন্টস হিরো এডমিন প্যানেল" else "গার্মেন্টস হিরো - গেম ও রিওয়ার্ডস",
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 19.sp
-                        )
-                        Text(
-                            text = if (isAdminMode) "এডমিন এক্সেস মোড - সকল ব্যবহারকারী ও উইথড্র" else "ফায়ারবেস রিয়েলটাইম লেভেল ও রিওয়ার্ড সিস্টেম",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = if (isAdminMode) Color(0xFF311B92) else MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = if (isAdminMode) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                actions = {
-                    if (isAdminMode) {
-                        IconButton(onClick = { viewModel.exitAdminMode() }) {
-                            Icon(
-                                imageVector = Icons.Default.ExitToApp,
-                                contentDescription = "Exit Admin",
-                                tint = Color.White
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable(
+                                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    viewModel.onHeaderClicked()
+                                }
+                        ) {
+                            Text(
+                                text = if (isAdminMode) "👑 গার্মেন্টস হিরো এডমিন প্যানেল" else "✨ গার্মেন্টস হিরো - মিশন ও রিওয়ার্ডস",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 18.5.sp,
+                                color = if (isAdminMode) Color(0xFFFFD700) else Color(0xFFFFE082),
+                                letterSpacing = 0.15.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isAdminMode) "এডমিন এক্সেস মোড - ইউজার ডাটা ও পেমেন্ট কন্ট্রোল" else "১,০০,০০০ লেভেল মিশন • প্রতিদিন আনলিমিটেড ইনকাম",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White.copy(alpha = 0.88f)
                             )
                         }
-                    } else {
-                        Surface(
-                            color = Color(0xFF2E7D32),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.padding(end = 12.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                            ) {
+
+                        if (isAdminMode) {
+                            IconButton(onClick = { viewModel.exitAdminMode() }) {
                                 Icon(
-                                    imageVector = Icons.Default.CloudDone,
-                                    contentDescription = "Firebase Connected",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(17.dp)
+                                    imageVector = Icons.Default.ExitToApp,
+                                    contentDescription = "Exit Admin",
+                                    tint = Color(0xFFFFD700)
                                 )
-                                Spacer(modifier = Modifier.width(5.dp))
-                                Text(
-                                    text = "Firebase Active",
-                                    color = Color.White,
-                                    fontSize = 12.5.sp,
-                                    fontWeight = FontWeight.ExtraBold
-                                )
+                            }
+                        } else {
+                            Surface(
+                                color = Color(0xFF00C853).copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.2.dp, Color(0xFFFFD700).copy(alpha = 0.8f)),
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudDone,
+                                        contentDescription = "Firebase Connected",
+                                        tint = Color(0xFFFFD700),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = "LIVE",
+                                        color = Color(0xFFFFD700),
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            )
+            }
         },
         bottomBar = {
             AdMobBannerView()
@@ -266,7 +301,15 @@ fun MainAuthApp(viewModel: AuthViewModel) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF0F1423),
+                            Color(0xFF14192B),
+                            Color(0xFF0B0F19)
+                        )
+                    )
+                )
         ) {
             if (showAdminPasswordDialog) {
                 AdminPasswordDialog(
@@ -295,6 +338,12 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                 )
             }
 
+            if (showWelcomeMotivation) {
+                WelcomeMotivationDialog(
+                    onDismiss = { viewModel.dismissWelcomeMotivation() }
+                )
+            }
+
             if (isAdminMode) {
                 AdminDashboardScreen(viewModel = viewModel)
             } else if (isAppBlocked) {
@@ -304,11 +353,26 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                     onAdminClick = { viewModel.onHeaderClicked() }
                 )
             } else if (currentUser != null) {
-                UserIncomeDashboard(
-                    user = currentUser!!,
-                    viewModel = viewModel,
-                    context = context
-                )
+                if (currentUser!!.isBanned) {
+                    UserBannedScreen(
+                        user = currentUser!!,
+                        whatsappNumber = whatsappNumber,
+                        onLogout = { viewModel.logout(context) },
+                        onContactAdmin = {
+                            launchWhatsAppHelpline(
+                                context = context,
+                                whatsappNumber = whatsappNumber,
+                                userMobile = currentUser!!.mobile
+                            )
+                        }
+                    )
+                } else {
+                    UserIncomeDashboard(
+                        user = currentUser!!,
+                        viewModel = viewModel,
+                        context = context
+                    )
+                }
             } else {
 
                 Column(
@@ -321,55 +385,84 @@ fun MainAuthApp(viewModel: AuthViewModel) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     // Tab Selector for Registration and Login
-                    TabRow(
-                        selectedTabIndex = selectedTab,
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant,
-                                shape = RoundedCornerShape(12.dp)
-                            )
+                    Surface(
+                        color = Color(0xFF161B2E),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(1.5.dp, Color(0xFFFFD700).copy(alpha = 0.5f)),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Tab(
-                            selected = selectedTab == 0,
-                            onClick = { viewModel.selectTab(0) },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.PersonAdd,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "নিবন্ধন (Register)",
-                                        fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
-                                    )
+                        TabRow(
+                            selectedTabIndex = selectedTab,
+                            containerColor = Color.Transparent,
+                            contentColor = Color(0xFFFFD700),
+                            divider = {},
+                            indicator = {}
+                        ) {
+                            Tab(
+                                selected = selectedTab == 0,
+                                onClick = { viewModel.selectTab(0) },
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (selectedTab == 0) Brush.horizontalGradient(
+                                            listOf(Color(0xFF00695C), Color(0xFF00C853))
+                                        ) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                                    ),
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(vertical = 10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PersonAdd,
+                                            contentDescription = null,
+                                            tint = if (selectedTab == 0) Color.White else Color(0xFFFFE082),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "নিবন্ধন (Register)",
+                                            fontWeight = if (selectedTab == 0) FontWeight.ExtraBold else FontWeight.Medium,
+                                            color = if (selectedTab == 0) Color.White else Color(0xFFFFE082),
+                                            fontSize = 14.sp
+                                        )
+                                    }
                                 }
-                            }
-                        )
-                        Tab(
-                            selected = selectedTab == 1,
-                            onClick = { viewModel.selectTab(1) },
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Login,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "লগ ইন (Login)",
-                                        fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
-                                    )
+                            )
+                            Tab(
+                                selected = selectedTab == 1,
+                                onClick = { viewModel.selectTab(1) },
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (selectedTab == 1) Brush.horizontalGradient(
+                                            listOf(Color(0xFF00695C), Color(0xFF00C853))
+                                        ) else Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                                    ),
+                                text = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(vertical = 10.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Login,
+                                            contentDescription = null,
+                                            tint = if (selectedTab == 1) Color.White else Color(0xFFFFE082),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "লগ ইন (Login)",
+                                            fontWeight = if (selectedTab == 1) FontWeight.ExtraBold else FontWeight.Medium,
+                                            color = if (selectedTab == 1) Color.White else Color(0xFFFFE082),
+                                            fontSize = 14.sp
+                                        )
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -516,42 +609,71 @@ fun RegistrationCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF161B2E)),
+        border = BorderStroke(1.5.dp, Color(0xFFFFD700).copy(alpha = 0.45f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = Icons.Default.HowToReg,
-                contentDescription = "Registration",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(Color(0xFF00C853).copy(alpha = 0.25f), Color(0xFF004D40))
+                        )
+                    )
+                    .border(1.2.dp, Color(0xFFFFD700), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.HowToReg,
+                    contentDescription = "Registration",
+                    tint = Color(0xFFFFD700),
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "নতুন প্লেয়ার অ্যাকাউন্ট তৈরি করুন",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                letterSpacing = 0.2.sp
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "১ লক্ষ লেভেল খেলে রিওয়ার্ড পয়েন্ট ও মিশন বোনাস অর্জন করুন!",
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color(0xFFFFE082),
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            val fieldColors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedLabelColor = Color(0xFFFFD700),
+                unfocusedLabelColor = Color(0xFF94A3B8),
+                focusedBorderColor = Color(0xFFFFD700),
+                unfocusedBorderColor = Color(0xFF334155),
+                cursorColor = Color(0xFFFFD700),
+                focusedLeadingIconColor = Color(0xFFFFD700),
+                unfocusedLeadingIconColor = Color(0xFF94A3B8)
+            )
+
             OutlinedTextField(
                 value = name,
                 onValueChange = { viewModel.onRegisterNameChange(it) },
                 label = { Text("আপনার নাম *") },
-                placeholder = { Text("যেমন: মোহাম্মদ রহিম") },
+                placeholder = { Text("যেমন: মোহাম্মদ রহিম", color = Color(0xFF64748B)) },
                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true
@@ -563,9 +685,10 @@ fun RegistrationCard(
                 value = mobile,
                 onValueChange = { viewModel.onRegisterMobileChange(it) },
                 label = { Text("মোবাইল নম্বর *") },
-                placeholder = { Text("017XXXXXXXX") },
+                placeholder = { Text("017XXXXXXXX", color = Color(0xFF64748B)) },
                 leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true
@@ -577,48 +700,67 @@ fun RegistrationCard(
                 value = referral,
                 onValueChange = { viewModel.onRegisterReferralChange(it) },
                 label = { Text("রেফারেল কোড (ঐচ্ছিক)") },
-                placeholder = { Text("যদি থাকে (যেমন: GH1234AB)") },
+                placeholder = { Text("যেমন: GH1234AB", color = Color(0xFF64748B)) },
                 leadingIcon = { Icon(Icons.Default.CardGiftcard, contentDescription = null) },
+                colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
-            Button(
-                onClick = { viewModel.register(context) },
-                enabled = !isLoading,
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp)
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(enabled = !isLoading) { viewModel.register(context) },
+                shape = RoundedCornerShape(14.dp),
+                color = Color.Unspecified
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("ফায়ারবেসে সেভ হচ্ছে...")
-                } else {
-                    Icon(Icons.Default.AppRegistration, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("নিবন্ধন করুন", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF00695C), Color(0xFF00C853))
+                            )
+                        )
+                        .border(1.dp, Color(0xFFFFD700).copy(alpha = 0.7f), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color(0xFFFFD700),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("ফায়ারবেসে সেভ হচ্ছে...", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AppRegistration, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("নিবন্ধন সম্পন্ন করুন", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             TextButton(
                 onClick = { viewModel.selectTab(1) }
             ) {
-                Text("ইতোমধ্যে অ্যাকাউন্ট আছে? ")
+                Text("ইতোমধ্যে অ্যাকাউন্ট আছে? ", color = Color(0xFFCBD5E1), fontSize = 13.5.sp)
                 Text(
                     text = "লগ ইন করুন",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFFFFD700),
+                    fontSize = 14.sp
                 )
             }
         }
@@ -635,83 +777,130 @@ fun LoginCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF161B2E)),
+        border = BorderStroke(1.5.dp, Color(0xFFFFD700).copy(alpha = 0.45f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = Icons.Default.LockOpen,
-                contentDescription = "Login",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.radialGradient(
+                            listOf(Color(0xFF00C853).copy(alpha = 0.25f), Color(0xFF004D40))
+                        )
+                    )
+                    .border(1.2.dp, Color(0xFFFFD700), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LockOpen,
+                    contentDescription = "Login",
+                    tint = Color(0xFFFFD700),
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = "প্লেয়ার অ্যাকাউন্টে প্রবেশ করুন",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White,
+                letterSpacing = 0.2.sp
             )
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "আপনার নিবন্ধিত মোবাইল নম্বর দিয়ে লগইন করুন",
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color(0xFFFFE082),
                 textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
+            val fieldColors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = Color.White,
+                unfocusedTextColor = Color.White,
+                focusedLabelColor = Color(0xFFFFD700),
+                unfocusedLabelColor = Color(0xFF94A3B8),
+                focusedBorderColor = Color(0xFFFFD700),
+                unfocusedBorderColor = Color(0xFF334155),
+                cursorColor = Color(0xFFFFD700),
+                focusedLeadingIconColor = Color(0xFFFFD700),
+                unfocusedLeadingIconColor = Color(0xFF94A3B8)
+            )
+
             OutlinedTextField(
                 value = mobile,
                 onValueChange = { viewModel.onLoginMobileChange(it) },
                 label = { Text("মোবাইল নম্বর *") },
-                placeholder = { Text("017XXXXXXXX") },
+                placeholder = { Text("017XXXXXXXX", color = Color(0xFF64748B)) },
                 leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 singleLine = true
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
-            Button(
-                onClick = { viewModel.login(context) },
-                enabled = !isLoading,
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(12.dp)
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(enabled = !isLoading) { viewModel.login(context) },
+                shape = RoundedCornerShape(14.dp),
+                color = Color.Unspecified
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("ফায়ারবেসে ভেরিফাই হচ্ছে...")
-                } else {
-                    Icon(Icons.Default.Login, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("লগ ইন করুন", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF00695C), Color(0xFF00C853))
+                            )
+                        )
+                        .border(1.dp, Color(0xFFFFD700).copy(alpha = 0.7f), RoundedCornerShape(14.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isLoading) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = Color(0xFFFFD700),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("লগইন যাচাই হচ্ছে...", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Login, contentDescription = null, tint = Color.White)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("লগ ইন করুন", fontSize = 16.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             TextButton(
                 onClick = { viewModel.selectTab(0) }
             ) {
-                Text("নতুন ব্যবহারকারী? ")
+                Text("নতুন ব্যবহারকারী? ", color = Color(0xFFCBD5E1), fontSize = 13.5.sp)
                 Text(
                     text = "নিবন্ধন করুন",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFFFFD700),
+                    fontSize = 14.sp
                 )
             }
         }
@@ -876,7 +1065,63 @@ fun UserIncomeDashboard(
             }
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // INSPIRATION & 5% LIFETIME EARNING GUIDE CARD
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { viewModel.openWelcomeMotivation() },
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1B1B38)),
+            border = BorderStroke(1.2.dp, Color(0xFFFFD700).copy(alpha = 0.8f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = "👑", fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "ইনকাম গাইড ও ৫% আজীবন কমিশন অফার",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 13.5.sp,
+                            color = Color(0xFFFFD700)
+                        )
+                        Text(
+                            text = "কীভাবে শুধু অ্যাড দেখে ও টিম বানিয়ে আনলিমিটেড আয় করবেন",
+                            fontSize = 11.5.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+
+                Surface(
+                    color = Color(0xFFFFD700).copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFFD700))
+                ) {
+                    Text(
+                        text = "পড়ুন ➔",
+                        color = Color(0xFFFFD700),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.5.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         // WHATSAPP 24/7 HELPLINE SUPPORT BANNER
         Card(
@@ -2247,14 +2492,14 @@ fun UserAccountDetailsCard(
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
-                        text = "🎁 রেফারেল ডাবল বোনাস অফার:",
+                        text = "🎁 আজীবন রেফারেল কমিশন অফার:",
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 14.sp,
                         color = Color(0xFFC25E00)
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "১. রেফারেল কোড দিয়ে সাইনআপ করলেই তাৎক্ষণিক ৳৫.০০ বোনাস।\n২. আপনার রেফার করা বন্ধু উইথড্র করলেই ১০% হারে পাবেন বোনাস (প্রতি ১০০ টাকায় ১০ টাকা, প্রতি রেফারে মোট সর্বোচ্চ ৫০ টাকা পর্যন্ত)!",
+                        text = "১. রেফারেল কোড দিয়ে সাইনআপ করলেই তাৎক্ষণিক ৳৫.০০ বোনাস।\n২. আপনার রেফার করা বন্ধু যতবার উইথড্র করবে, প্রতিবার আপনি আজীবন পাবেন শতকরা ৫% কমিশন (কোনো লিমিট নেই, আজীবন চালু থাকবে)!",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF3E2723),
@@ -2924,6 +3169,7 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(14.dp)
     ) {
         // Admin Header Banner
@@ -3098,7 +3344,7 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -3113,17 +3359,13 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("কোনো উইথড্র রিকোয়েস্ট পাওয়া যায়নি।")
                 }
             } else {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     withdrawals.forEach { item ->
                         AdminWithdrawalItemCard(
                             item = item,
@@ -3140,30 +3382,45 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .padding(32.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("কোনো নিবন্ধিত ইউজার পাওয়া যায়নি।")
                 }
             } else {
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     users.forEach { u ->
-                        AdminUserItemCard(user = u)
+                        AdminUserItemCard(
+                            user = u,
+                            onSaveEdit = { name, level, taka, coins, refCode, refBy ->
+                                viewModel.adminUpdateUser(
+                                    userMobile = u.mobile,
+                                    updatedName = name,
+                                    updatedCurrentLevel = level,
+                                    updatedEarningsTaka = taka,
+                                    updatedRewardCoins = coins,
+                                    updatedReferralCode = refCode,
+                                    updatedReferredBy = refBy
+                                )
+                            },
+                            onToggleBan = { isBanned, reason ->
+                                viewModel.adminSetUserBanStatus(
+                                    userMobile = u.mobile,
+                                    isBanned = isBanned,
+                                    banReason = reason
+                                )
+                            },
+                            onDeleteUser = {
+                                viewModel.adminDeleteUser(userMobile = u.mobile)
+                            }
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }
         } else {
             // App Settings & Notice Controller Tab
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -3307,6 +3564,8 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
                 }
             }
         }
+        
+        Spacer(modifier = Modifier.height(60.dp))
     }
 }
 
@@ -3417,18 +3676,16 @@ fun AdminWithdrawalItemCard(
             )
 
             if (item.referredBy.isNotBlank()) {
-                val potentialBonus = item.amountTaka * 0.10
+                val potentialBonus = item.amountTaka * 0.05
                 val bonusStatusText = if (item.status == "APPROVED" && item.referralBonusAmount > 0.0) {
-                    "✅ ১০% রেফারেল বোনাস ৳${String.format(Locale.US, "%.2f", item.referralBonusAmount)} রেফারকারী (${item.referredBy}) এর অ্যাকাউন্টে জমা হয়েছে।"
-                } else if (item.status == "PENDING" && !item.hasEarnedReferralBonus) {
-                    "🎉 এপ্রুভ করলে রেফারকারী (${item.referredBy}) ১০% হারে ৳${String.format(Locale.US, "%.2f", potentialBonus)} বোনাস পাবেন (সর্বোচ্চ ৫০৳ লিমিট পর্যন্ত)!"
-                } else if (item.hasEarnedReferralBonus) {
-                    "ℹ️ রেফারেল সর্বোচ্চ ৫০৳ বোনাস লিমিট ইতিমধ্যে সম্পন্ন হয়েছে।"
+                    "✅ ৫% আজীবন রেফারেল কমিশন ৳${String.format(Locale.US, "%.2f", item.referralBonusAmount)} রেফারকারী (${item.referredBy}) এর অ্যাকাউন্টে জমা হয়েছে।"
+                } else if (item.status == "PENDING") {
+                    "🎉 এপ্রুভ করলে রেফারকারী (${item.referredBy}) ৫% হারে ৳${String.format(Locale.US, "%.2f", potentialBonus)} আজীবন লাইফটাইম কমিশন পাবেন!"
                 } else {
                     "ℹ️ রেফারকারী: ${item.referredBy}"
                 }
-                val bonusColor = if (item.status == "APPROVED" && item.referralBonusAmount > 0.0 || item.status == "PENDING" && !item.hasEarnedReferralBonus) Color(0xFF1B5E20) else Color(0xFFE65100)
-                val bonusBg = if (item.status == "APPROVED" && item.referralBonusAmount > 0.0 || item.status == "PENDING" && !item.hasEarnedReferralBonus) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+                val bonusColor = if (item.status == "APPROVED" && item.referralBonusAmount > 0.0 || item.status == "PENDING") Color(0xFF1B5E20) else Color(0xFFE65100)
+                val bonusBg = if (item.status == "APPROVED" && item.referralBonusAmount > 0.0 || item.status == "PENDING") Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
 
                 Spacer(modifier = Modifier.height(4.dp))
                 Surface(
@@ -3479,7 +3736,16 @@ fun AdminWithdrawalItemCard(
 }
 
 @Composable
-fun AdminUserItemCard(user: User) {
+fun AdminUserItemCard(
+    user: User,
+    onSaveEdit: (name: String, level: Int, earningsTaka: Double, rewardCoins: Long, refCode: String, refBy: String) -> Unit,
+    onToggleBan: (isBanned: Boolean, banReason: String) -> Unit,
+    onDeleteUser: () -> Unit
+) {
+    var showEditDialog by remember { mutableStateOf(false) }
+    var showBanDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+
     val dateFormatted = try {
         val sdf = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
         sdf.format(java.util.Date(user.createdAt))
@@ -3490,87 +3756,399 @@ fun AdminUserItemCard(user: User) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (user.isBanned) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surface
+        ),
+        border = if (user.isBanned) BorderStroke(1.5.dp, Color(0xFFD32F2F)) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.Top
+                .padding(14.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFF311B92)),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = user.name.take(1).uppercase().ifEmpty { "U" },
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-            }
+                Box(
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(if (user.isBanned) Color(0xFFD32F2F) else Color(0xFF311B92)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = user.name.take(1).uppercase().ifEmpty { "U" },
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                }
 
-            Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = user.name.ifEmpty { "ইউজার (${user.mobile})" },
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "📱 মোবাইল: ${user.mobile}",
-                    fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "📅 যোগদানের সময়: $dateFormatted",
-                    fontSize = 12.5.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF475569)
-                )
-                Text(
-                    text = "🎁 নিজের কোড: ${user.referralCode} | 🤝 যার রেফারে: ${if (user.referredBy.isNotBlank()) user.referredBy else "সরাসরি"}",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFD97706)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        color = Color(0xFF311B92).copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(6.dp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "⭐ লেভেল #${user.currentLevel}",
-                            fontSize = 12.sp,
+                            text = user.name.ifEmpty { "ইউজার (${user.mobile})" },
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF311B92),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+
+                        if (user.isBanned) {
+                            Surface(
+                                color = Color(0xFFD32F2F),
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = "🚫 BANNED",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "📱 মোবাইল: ${user.mobile}",
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "📅 যোগদানের সময়: $dateFormatted",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF475569)
+                    )
+                    Text(
+                        text = "🎁 নিজের কোড: ${user.referralCode} | 🤝 যার রেফারে: ${if (user.referredBy.isNotBlank()) user.referredBy else "সরাসরি"}",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFD97706)
+                    )
+
+                    if (user.isBanned && user.banReason.isNotBlank()) {
+                        Text(
+                            text = "⚠️ ব্যান কারণ: ${user.banReason}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFFC62828)
                         )
                     }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Surface(
-                        color = Color(0xFF2E7D32).copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(6.dp)
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(
-                            text = "💰 ব্যালেন্স: ৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF15803D),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
+                        Surface(
+                            color = Color(0xFF311B92).copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "⭐ লেভেল #${user.currentLevel}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF311B92),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+
+                        Surface(
+                            color = Color(0xFF2E7D32).copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "💰 ৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF15803D),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+
+                        Surface(
+                            color = Color(0xFFE65100).copy(alpha = 0.1f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = "🪙 ${user.rewardCoins} কয়েন",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFE65100),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Action Buttons Row: Edit (লেভেল/টাকা/নাম), Ban/Unban, Delete
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Edit Button
+                OutlinedButton(
+                    onClick = { showEditDialog = true },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF311B92)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit",
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("এডিট / পরিবর্তন", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Ban / Unban Button
+                Button(
+                    onClick = {
+                        if (user.isBanned) {
+                            onToggleBan(false, "")
+                        } else {
+                            showBanDialog = true
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (user.isBanned) Color(0xFF2E7D32) else Color(0xFFD97706)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = if (user.isBanned) Icons.Default.CheckCircle else Icons.Default.Block,
+                        contentDescription = "Ban Status",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (user.isBanned) "আনব্যান করুন" else "ব্যান করুন",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+
+                // Delete Button
+                IconButton(
+                    onClick = { showDeleteConfirmDialog = true },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(Color(0xFFFFEBEE), RoundedCornerShape(8.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteForever,
+                        contentDescription = "Delete User",
+                        tint = Color(0xFFD32F2F),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
         }
+    }
+
+    // 1. Edit User Details Dialog (Change Level, Money, Coins, Name, Referrer)
+    if (showEditDialog) {
+        var editName by remember { mutableStateOf(user.name) }
+        var editLevel by remember { mutableStateOf(user.currentLevel.toString()) }
+        var editTaka by remember { mutableStateOf(String.format(Locale.US, "%.2f", user.earningsTaka)) }
+        var editCoins by remember { mutableStateOf(user.rewardCoins.toString()) }
+        var editReferralCode by remember { mutableStateOf(user.referralCode) }
+        var editReferredBy by remember { mutableStateOf(user.referredBy) }
+
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = {
+                Text("🛠️ ইউজার তথ্য পরিবর্তন (এডমিন)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "মোবাইল: ${user.mobile}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF311B92)
+                    )
+
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = { editName = it },
+                        label = { Text("ইউজারের নাম") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = editLevel,
+                        onValueChange = { editLevel = it.filter { char -> char.isDigit() } },
+                        label = { Text("⭐ বর্তমান লেভেল (Level)") },
+                        supportingText = { Text("লেভেল রিসেট বা যেকোনো লেভেলে সেট করতে পারবেন") },
+                        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = editTaka,
+                        onValueChange = { editTaka = it },
+                        label = { Text("💰 ব্যালেন্স টাকা (৳)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = editCoins,
+                        onValueChange = { editCoins = it.filter { char -> char.isDigit() } },
+                        label = { Text("🪙 রিওয়ার্ড কয়েন (Coins)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = editReferralCode,
+                        onValueChange = { editReferralCode = it.uppercase() },
+                        label = { Text("ইউজারের রেফারেল কোড") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = editReferredBy,
+                        onValueChange = { editReferredBy = it.uppercase() },
+                        label = { Text("যার রেফার কোডে যুক্ত হয়েছে") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val levelInt = editLevel.toIntOrNull() ?: user.currentLevel
+                        val takaDouble = editTaka.toDoubleOrNull() ?: user.earningsTaka
+                        val coinsLong = editCoins.toLongOrNull() ?: user.rewardCoins
+                        onSaveEdit(
+                            editName.trim(),
+                            levelInt,
+                            takaDouble,
+                            coinsLong,
+                            editReferralCode.trim(),
+                            editReferredBy.trim()
+                        )
+                        showEditDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF311B92))
+                ) {
+                    Text("সংরক্ষণ করুন")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("বাতিল")
+                }
+            }
+        )
+    }
+
+    // 2. Ban Reason Dialog
+    if (showBanDialog) {
+        var banReasonText by remember { mutableStateOf("অস্বাভাবিক কার্যকলাপ বা নিয়ম লঙ্ঘনের কারণে ব্যান করা হয়েছে।") }
+
+        AlertDialog(
+            onDismissRequest = { showBanDialog = false },
+            title = {
+                Text("🚫 ইউজার ব্যান করুন", fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("এই ইউজার (${user.name} - ${user.mobile}) কে ব্যান করতে চান? ব্যান করলে ইউজার অ্যাপে ঢুকতে পারবে না।")
+                    OutlinedTextField(
+                        value = banReasonText,
+                        onValueChange = { banReasonText = it },
+                        label = { Text("ব্যানের কারণ") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onToggleBan(true, banReasonText)
+                        showBanDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) {
+                    Text("হ্যাঁ, ব্যান করুন")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBanDialog = false }) {
+                    Text("বাতিল")
+                }
+            }
+        )
+    }
+
+    // 3. Delete Confirmation Dialog
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = {
+                Text("⚠️ স্থায়ীভাবে মুছে ফেলুন (Delete)", fontWeight = FontWeight.Bold, color = Color(0xFFD32F2F))
+            },
+            text = {
+                Text("আপনি কি নিশ্চিত যে ইউজার '${user.name}' (${user.mobile}) এর সকল তথ্য ডাটাবেজ থেকে সম্পূর্ণ মুছে ফেলতে চান? এই অ্যাকশন আর ফেরানো যাবে না।")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onDeleteUser()
+                        showDeleteConfirmDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F))
+                ) {
+                    Text("ডিলিট করুন")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("বাতিল")
+                }
+            }
+        )
     }
 }
 
@@ -4418,5 +4996,426 @@ fun DailyCheckInCelebrationDialog(
         }
     )
 }
+
+@Composable
+fun UserBannedScreen(
+    user: User,
+    whatsappNumber: String,
+    onLogout: () -> Unit,
+    onContactAdmin: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0F0D1B))
+            .padding(20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C192E)),
+            shape = RoundedCornerShape(20.dp),
+            border = BorderStroke(2.dp, Color(0xFFE53935)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    color = Color(0xFFD32F2F).copy(alpha = 0.2f),
+                    shape = CircleShape,
+                    border = BorderStroke(2.dp, Color(0xFFD32F2F)),
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Block,
+                        contentDescription = "Banned",
+                        tint = Color(0xFFFF5252),
+                        modifier = Modifier
+                            .padding(18.dp)
+                            .size(56.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "আপনার একাউন্ট ব্যান করা হয়েছে!",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF5252),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "ইউজার: ${user.name} (${user.mobile})",
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Surface(
+                    color = Color(0xFF2D1616),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFFD32F2F).copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "ব্যানের কারণ:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF8A80)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = user.banReason.ifBlank { "অস্বাভাবিক কার্যকলাপ বা অ্যাপের নিয়ম লঙ্ঘনের কারণে এডমিন কর্তৃক একাউন্টটি স্থগিত করা হয়েছে।" },
+                            fontSize = 13.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Contact Admin WhatsApp Button
+                Button(
+                    onClick = onContactAdmin,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF25D366))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Chat,
+                        contentDescription = "WhatsApp",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "এডমিনের সাথে WhatsApp এ যোগাযোগ করুন",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 13.5.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Logout Button
+                OutlinedButton(
+                    onClick = onLogout,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White.copy(alpha = 0.8f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ExitToApp,
+                        contentDescription = "Logout",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("লগ আউট করুন")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WelcomeMotivationDialog(
+    onDismiss: () -> Unit
+) {
+    val steps = listOf(
+        MotivationStep(
+            stepNumber = 1,
+            badge = "ধাপ ১/৪ • সহজ ইনকাম",
+            icon = "📱",
+            headline = "স্মার্টফোনে ঘরে বসেই নিশ্চিত ইনকাম!",
+            title = "প্রতিটি অ্যাড দেখার বিনিময়ে ১০০% রিয়েল টাকা",
+            desc = "কোনো কঠিন কাজ বা জটিল নিয়ম নেই! প্রতিদিন ঘরে বসে শুধুমাত্র ছোট ছোট ভিডিও বিজ্ঞাপন ও ব্যানার দেখে নিশ্চিত টাকা ও রিওয়ার্ড কয়েন অর্জন করুন। আপনার অবসর সময়কে রূপান্তর করুন আসল উপার্জনে!",
+            accentColor = Color(0xFF00E676),
+            bgColor = Color(0xFF063826)
+        ),
+        MotivationStep(
+            stepNumber = 2,
+            badge = "ধাপ ২/৪ • আজীবন কমিশন",
+            icon = "🚀",
+            headline = "জীবন বদলে দেওয়ার মতো আজীবন ইনকাম!",
+            title = "৫% আজীবন লাইফটাইম রেফারেল কমিশন (প্যাসিভ আয়)",
+            desc = "আপনি নিজে অ্যাড দেখে ইনকাম করবেন এবং আপনার বন্ধুবান্ধবদের রেফারেল কোড শেয়ার করবেন। আপনার রেফার করা মেম্বার যতবারই টাকা উইথড্র করবে, প্রতিবারই আপনি আজীবন পাবেন শতকরা ৫% সরাসরি নগদ কমিশন! কোনো লিমিট নেই—লাইফটাইম কমিশন উপভোগ করুন!",
+            accentColor = Color(0xFFFFD700),
+            bgColor = Color(0xFF3D2C04)
+        ),
+        MotivationStep(
+            stepNumber = 3,
+            badge = "ধাপ ৩/৪ • দ্রুত উইথড্রল",
+            icon = "⚡",
+            headline = "১০০% বিশ্বস্ত ও দ্রুত পেমেন্ট সুবিধা!",
+            title = "বিকাশ, নগদ ও রকেটে সরাসরি ক্যাশআউট",
+            desc = "কোনো প্রকার ঝামেলা বা বিলম্ব ছাড়াই সরাসরি আপনার বিকাশ, নগদ অথবা রকেট নম্বরে উইথড্র দিয়ে টাকা বুঝে নিন। প্রতি সপ্তাহে শত শত ইউজার নিয়মিত পেমেন্ট পাচ্ছেন!",
+            accentColor = Color(0xFF00B0FF),
+            bgColor = Color(0xFF0A2E4C)
+        ),
+        MotivationStep(
+            stepNumber = 4,
+            badge = "ধাপ ৪/৪ • শুরু করুন আজই",
+            icon = "🏆",
+            headline = "আপনার সাফল্য আপনার নিজের হাতে!",
+            title = "টিম গড়ে তুলুন এবং শুরু করুন আসল ইনকাম",
+            desc = "দেরি না করে এখনই অ্যাড দেখা শুরু করুন এবং আপনার রেফারেল কোড বেশি বেশি বন্ধুদের মাঝে ছড়িয়ে দিয়ে আজই আপনার আজীবন আয়ের টিম গড়ে তুলুন!",
+            accentColor = Color(0xFFFF9100),
+            bgColor = Color(0xFF3E1F03)
+        )
+    )
+
+    var currentStepIndex by remember { mutableStateOf(0) }
+    val currentStep = steps[currentStepIndex]
+    val isLastStep = currentStepIndex == steps.lastIndex
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.90f))
+                .padding(horizontal = 14.dp, vertical = 20.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFF0F172A)
+                ),
+                border = BorderStroke(
+                    2.dp,
+                    Brush.linearGradient(
+                        listOf(
+                            currentStep.accentColor,
+                            Color(0xFFFF9800),
+                            currentStep.accentColor
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Header Bar with Step Badge, Step Indicator & Skip Button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            color = currentStep.accentColor.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, currentStep.accentColor)
+                        ) {
+                            Text(
+                                text = currentStep.badge,
+                                color = currentStep.accentColor,
+                                fontSize = 11.5.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Progress Indicator Dots
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                steps.indices.forEach { index ->
+                                    val isActive = index == currentStepIndex
+                                    Box(
+                                        modifier = Modifier
+                                            .size(if (isActive) 16.dp else 6.dp, 6.dp)
+                                            .background(
+                                                color = if (isActive) currentStep.accentColor else Color.White.copy(alpha = 0.3f),
+                                                shape = RoundedCornerShape(3.dp)
+                                            )
+                                    )
+                                }
+                            }
+
+                            // Skip Button
+                            Surface(
+                                modifier = Modifier.clickable { onDismiss() },
+                                color = Color.White.copy(alpha = 0.12f),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "স্কিপ ✕",
+                                        color = Color.White,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Step Big Icon
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = currentStep.accentColor.copy(alpha = 0.15f),
+                        border = BorderStroke(1.5.dp, currentStep.accentColor.copy(alpha = 0.8f)),
+                        modifier = Modifier.size(72.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(text = currentStep.icon, fontSize = 36.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Headline
+                    Text(
+                        text = currentStep.headline,
+                        fontSize = 17.5.sp,
+                        fontWeight = FontWeight.Black,
+                        color = currentStep.accentColor,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 23.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Main Reading Content Card
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = currentStep.bgColor,
+                        border = BorderStroke(1.2.dp, currentStep.accentColor.copy(alpha = 0.7f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(14.dp)
+                        ) {
+                            Text(
+                                text = currentStep.title,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.5.sp,
+                                color = Color.White,
+                                lineHeight = 20.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = currentStep.desc,
+                                fontSize = 13.sp,
+                                color = Color(0xFFF1F5F9),
+                                lineHeight = 19.sp,
+                                fontWeight = FontWeight.Normal
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // Navigation Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (currentStepIndex > 0) {
+                            OutlinedButton(
+                                onClick = { currentStepIndex-- },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = Color.White
+                                )
+                            ) {
+                                Text(
+                                    text = "⬅ পূর্ববর্তী",
+                                    fontSize = 13.5.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (isLastStep) {
+                                    onDismiss()
+                                } else {
+                                    currentStepIndex++
+                                }
+                            },
+                            modifier = Modifier
+                                .weight(if (currentStepIndex > 0) 1.5f else 1f)
+                                .height(48.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isLastStep) Color(0xFF00C853) else Color(0xFFFFD700)
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(6.dp)
+                        ) {
+                            Text(
+                                text = if (isLastStep) "🚀 মেইন পেজে প্রবেশ করুন" else "পরের নিয়ম পড়ুন ➔",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (isLastStep) Color.White else Color.Black
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class MotivationStep(
+    val stepNumber: Int,
+    val badge: String,
+    val icon: String,
+    val headline: String,
+    val title: String,
+    val desc: String,
+    val accentColor: Color,
+    val bgColor: Color
+)
+
 
 

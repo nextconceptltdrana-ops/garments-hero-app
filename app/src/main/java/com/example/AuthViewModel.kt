@@ -66,21 +66,21 @@ class AuthViewModel : ViewModel() {
     val isDeletingAccount: StateFlow<Boolean> = _isDeletingAccount.asStateFlow()
 
     // Robust State Machine for Quiz Flow
-    // Sequence: Start -> Ad1 -> Ad2 -> Ad3 -> Ad4 -> Captcha -> Ad5 -> Ad6 -> Ad7 -> Ad8 -> Spin -> Ad9 -> Ad10 -> Ad11 -> Ad12 -> Level Update
+    // Sequence: Start -> 6 Ads (Ad1..Ad6) -> Captcha -> 4 Ads (Ad7..Ad10) -> Spin Bonus -> 2 Ads (Ad11..Ad12) -> Level Update & Rewards
     sealed class QuizFlowState {
         object Idle : QuizFlowState()
         object Ad1 : QuizFlowState()
         object Ad2 : QuizFlowState()
         object Ad3 : QuizFlowState()
         object Ad4 : QuizFlowState()
-        object Captcha : QuizFlowState()
         object Ad5 : QuizFlowState()
         object Ad6 : QuizFlowState()
+        object Captcha : QuizFlowState()
         object Ad7 : QuizFlowState()
         object Ad8 : QuizFlowState()
-        object Spin : QuizFlowState()
         object Ad9 : QuizFlowState()
         object Ad10 : QuizFlowState()
+        object Spin : QuizFlowState()
         object Ad11 : QuizFlowState()
         object Ad12 : QuizFlowState()
         object LevelUpdate : QuizFlowState()
@@ -164,8 +164,34 @@ class AuthViewModel : ViewModel() {
     private val _isAdminLoading = MutableStateFlow(false)
     val isAdminLoading: StateFlow<Boolean> = _isAdminLoading.asStateFlow()
 
+    private val _showWelcomeMotivation = MutableStateFlow(false)
+    val showWelcomeMotivation: StateFlow<Boolean> = _showWelcomeMotivation.asStateFlow()
+
     private var headerClickCount = 0
     private var hasPlayedSessionAd = false
+
+    fun openWelcomeMotivation() {
+        _showWelcomeMotivation.value = true
+    }
+
+    fun dismissWelcomeMotivation() {
+        _showWelcomeMotivation.value = false
+    }
+
+    fun playStartupOpeningAds(activity: android.app.Activity) {
+        if (hasPlayedSessionAd) return
+        hasPlayedSessionAd = true
+        _adStatusMessage.value = "স্পন্সরড বিজ্ঞাপন ১/২..."
+        playAd(activity, "স্পন্সরড বিজ্ঞাপন ১/২", 1) {
+            FirebaseUserManager.recordAdminAdImpression(adTakaAmount = 1.0) {}
+            _adStatusMessage.value = "স্পন্সরড বিজ্ঞাপন ২/২..."
+            playAd(activity, "স্পন্সরড বিজ্ঞাপন ২/২", 2) {
+                FirebaseUserManager.recordAdminAdImpression(adTakaAmount = 1.0) {}
+                _adStatusMessage.value = null
+                _showWelcomeMotivation.value = true
+            }
+        }
+    }
 
     private fun findActivity(context: Context): android.app.Activity? {
         var ctx = context
@@ -289,6 +315,58 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    fun adminUpdateUser(
+        userMobile: String,
+        updatedName: String,
+        updatedCurrentLevel: Int,
+        updatedEarningsTaka: Double,
+        updatedRewardCoins: Long,
+        updatedReferralCode: String,
+        updatedReferredBy: String
+    ) {
+        _isAdminLoading.value = true
+        FirebaseUserManager.adminUpdateUser(
+            userMobile = userMobile,
+            updatedName = updatedName,
+            updatedCurrentLevel = updatedCurrentLevel,
+            updatedEarningsTaka = updatedEarningsTaka,
+            updatedRewardCoins = updatedRewardCoins,
+            updatedReferralCode = updatedReferralCode,
+            updatedReferredBy = updatedReferredBy
+        ) { success, message ->
+            _isAdminLoading.value = false
+            _userMessage.value = message
+            _isSuccessMsg.value = success
+            if (success) {
+                loadAdminData()
+            }
+        }
+    }
+
+    fun adminSetUserBanStatus(userMobile: String, isBanned: Boolean, banReason: String) {
+        _isAdminLoading.value = true
+        FirebaseUserManager.adminSetUserBanStatus(userMobile, isBanned, banReason) { success, message ->
+            _isAdminLoading.value = false
+            _userMessage.value = message
+            _isSuccessMsg.value = success
+            if (success) {
+                loadAdminData()
+            }
+        }
+    }
+
+    fun adminDeleteUser(userMobile: String) {
+        _isAdminLoading.value = true
+        FirebaseUserManager.adminDeleteUser(userMobile) { success, message ->
+            _isAdminLoading.value = false
+            _userMessage.value = message
+            _isSuccessMsg.value = success
+            if (success) {
+                loadAdminData()
+            }
+        }
+    }
+
 
     private var userSnapshotListener: com.google.firebase.firestore.ListenerRegistration? = null
 
@@ -398,6 +476,12 @@ class AuthViewModel : ViewModel() {
                 _currentUser.value = user
                 startListeningToUser(context, user.mobile)
                 refreshReferralData(context)
+                val activity = findActivity(context)
+                if (activity != null) {
+                    playStartupOpeningAds(activity)
+                } else {
+                    _showWelcomeMotivation.value = true
+                }
             }
         }
     }
@@ -417,10 +501,11 @@ class AuthViewModel : ViewModel() {
                 _currentUser.value = user
                 startListeningToUser(context, user.mobile)
                 refreshReferralData(context)
-                hasPlayedSessionAd = true
                 val activity = findActivity(context)
                 if (activity != null) {
-                    playLoginAdForAdmin(activity)
+                    playStartupOpeningAds(activity)
+                } else {
+                    _showWelcomeMotivation.value = true
                 }
             }
         }
@@ -464,7 +549,7 @@ class AuthViewModel : ViewModel() {
 
     /**
      * Start the sequential 12-Ad queue system for level completion.
-     * Ads 1-4 -> Captcha Verification -> Ads 5-8 -> Spin Bonus -> Ads 9-12 -> Atomic Reward Credit
+     * Sequence: Ads 1-6 -> Captcha Verification -> Ads 7-10 -> Spin Bonus -> Ads 11-12 -> Atomic Reward Credit
      * Ensures all 12 ads are sequentially requested, viewed, and dismissed before point rewards are granted.
      */
     fun startQuizFlow(activity: android.app.Activity) {
@@ -498,10 +583,24 @@ class AuthViewModel : ViewModel() {
                         verifiedAdsCountInCurrentLevel = 4
                         _adQueueProgress.value = 4
 
-                        // Middle Step A: Human verification checkpoint
-                        _quizFlowState.value = QuizFlowState.Captcha
-                        _showCaptchaDialog.value = true
-                        _adStatusMessage.value = "সিকিউরিটি ভেরিফিকেশন সম্পন্ন করুন (৪/১২ অ্যাড সম্পন্ন)..."
+                        // Step 5: Ad 5 of 12
+                        _quizFlowState.value = QuizFlowState.Ad5
+                        playAd(activity, "অ্যাড ৫/১২", 5) {
+                            verifiedAdsCountInCurrentLevel = 5
+                            _adQueueProgress.value = 5
+
+                            // Step 6: Ad 6 of 12
+                            _quizFlowState.value = QuizFlowState.Ad6
+                            playAd(activity, "অ্যাড ৬/১২", 6) {
+                                verifiedAdsCountInCurrentLevel = 6
+                                _adQueueProgress.value = 6
+
+                                // Checkpoint 1: Google Captcha Security Verification (after 6 ads)
+                                _quizFlowState.value = QuizFlowState.Captcha
+                                _showCaptchaDialog.value = true
+                                _adStatusMessage.value = "সিকিউরিটি ভেরিফিকেশন সম্পন্ন করুন (৬/১২ অ্যাড সম্পন্ন)..."
+                            }
+                        }
                     }
                 }
             }
@@ -515,35 +614,35 @@ class AuthViewModel : ViewModel() {
 
     fun onCaptchaVerified(activity: android.app.Activity) {
         _showCaptchaDialog.value = false
-        _quizFlowState.value = QuizFlowState.Ad5
 
-        // Step 5: Ad 5 of 12
-        playAd(activity, "অ্যাড ৫/১২", 5) {
-            verifiedAdsCountInCurrentLevel = 5
-            _adQueueProgress.value = 5
+        // Step 7: Ad 7 of 12
+        _quizFlowState.value = QuizFlowState.Ad7
+        playAd(activity, "অ্যাড ৭/১২", 7) {
+            verifiedAdsCountInCurrentLevel = 7
+            _adQueueProgress.value = 7
 
-            // Step 6: Ad 6 of 12
-            _quizFlowState.value = QuizFlowState.Ad6
-            playAd(activity, "অ্যাড ৬/১২", 6) {
-                verifiedAdsCountInCurrentLevel = 6
-                _adQueueProgress.value = 6
+            // Step 8: Ad 8 of 12
+            _quizFlowState.value = QuizFlowState.Ad8
+            playAd(activity, "অ্যাড ৮/১২", 8) {
+                verifiedAdsCountInCurrentLevel = 8
+                _adQueueProgress.value = 8
 
-                // Step 7: Ad 7 of 12
-                _quizFlowState.value = QuizFlowState.Ad7
-                playAd(activity, "অ্যাড ৭/১২", 7) {
-                    verifiedAdsCountInCurrentLevel = 7
-                    _adQueueProgress.value = 7
+                // Step 9: Ad 9 of 12
+                _quizFlowState.value = QuizFlowState.Ad9
+                playAd(activity, "অ্যাড ৯/১২", 9) {
+                    verifiedAdsCountInCurrentLevel = 9
+                    _adQueueProgress.value = 9
 
-                    // Step 8: Ad 8 of 12
-                    _quizFlowState.value = QuizFlowState.Ad8
-                    playAd(activity, "অ্যাড ৮/১২", 8) {
-                        verifiedAdsCountInCurrentLevel = 8
-                        _adQueueProgress.value = 8
+                    // Step 10: Ad 10 of 12 (4 ads completed after captcha)
+                    _quizFlowState.value = QuizFlowState.Ad10
+                    playAd(activity, "অ্যাড ১০/১২", 10) {
+                        verifiedAdsCountInCurrentLevel = 10
+                        _adQueueProgress.value = 10
 
-                        // Middle Step B: Lucky Spin Bonus Wheel
+                        // Checkpoint 2: Lucky Spin Bonus Wheel (after 10 ads total)
                         _quizFlowState.value = QuizFlowState.Spin
                         _showSpinBarDialog.value = true
-                        _adStatusMessage.value = "লাকি স্পিন বার ঘুরিয়ে বোনাস জিতে নিন (৮/১২ অ্যাড সম্পন্ন)..."
+                        _adStatusMessage.value = "লাকি স্পিন বার ঘুরিয়ে বোনাস জিতে নিন (১০/১২ অ্যাড সম্পন্ন)..."
                     }
                 }
             }
@@ -553,69 +652,55 @@ class AuthViewModel : ViewModel() {
     fun onSpinCompletedAndPlayFinalAds(activity: android.app.Activity, spinBonusTaka: Double) {
         _showSpinBarDialog.value = false
         pendingSpinBonusTaka = spinBonusTaka
-        _quizFlowState.value = QuizFlowState.Ad9
 
-        // Step 9: Ad 9 of 12
-        playAd(activity, "অ্যাড ৯/১২", 9) {
-            verifiedAdsCountInCurrentLevel = 9
-            _adQueueProgress.value = 9
+        // Step 11: Ad 11 of 12
+        _quizFlowState.value = QuizFlowState.Ad11
+        playAd(activity, "অ্যাড ১১/১২", 11) {
+            verifiedAdsCountInCurrentLevel = 11
+            _adQueueProgress.value = 11
 
-            // Step 10: Ad 10 of 12
-            _quizFlowState.value = QuizFlowState.Ad10
-            playAd(activity, "অ্যাড ১০/১২", 10) {
-                verifiedAdsCountInCurrentLevel = 10
-                _adQueueProgress.value = 10
+            // Step 12: Final Ad 12 of 12 (2 ads completed after spin)
+            _quizFlowState.value = QuizFlowState.Ad12
+            playAd(activity, "অ্যাড ১২/১২", 12) {
+                verifiedAdsCountInCurrentLevel = 12
+                _adQueueProgress.value = 12
 
-                // Step 11: Ad 11 of 12
-                _quizFlowState.value = QuizFlowState.Ad11
-                playAd(activity, "অ্যাড ১১/১২", 11) {
-                    verifiedAdsCountInCurrentLevel = 11
-                    _adQueueProgress.value = 11
+                // Strict verification: Ensure all 12 ads are completed
+                if (verifiedAdsCountInCurrentLevel >= 12) {
+                    _quizFlowState.value = QuizFlowState.LevelUpdate
+                    _adStatusMessage.value = "১২/১২ বিজ্ঞাপন সম্পন্ন হয়েছে! লেভেল ও পয়েন্ট যোগ হচ্ছে..."
 
-                    // Step 12: Final Ad 12 of 12
-                    _quizFlowState.value = QuizFlowState.Ad12
-                    playAd(activity, "অ্যাড ১২/১২", 12) {
-                        verifiedAdsCountInCurrentLevel = 12
-                        _adQueueProgress.value = 12
+                    val totalTakaEarned = 0.06 + pendingSpinBonusTaka
+                    val bonusCoins = (pendingSpinBonusTaka * 100).toLong()
+                    val totalCoinsEarned = 6L + bonusCoins
+                    val previousLevel = maxOf(_currentUser.value?.currentLevel ?: 1, (_currentUser.value?.completedLevels ?: 0) + 1)
 
-                        // Strict verification: Ensure all 12 ads are completed
-                        if (verifiedAdsCountInCurrentLevel >= 12) {
-                            _quizFlowState.value = QuizFlowState.LevelUpdate
-                            _adStatusMessage.value = "১২/১২ বিজ্ঞাপন সম্পন্ন হয়েছে! লেভেল ও পয়েন্ট যোগ হচ্ছে..."
+                    completeCurrentLevel(
+                        activity.applicationContext,
+                        takaEarned = totalTakaEarned,
+                        coinsEarned = totalCoinsEarned
+                    ) { updatedUser ->
+                        val resultMsg = "🎉 অভিনন্দন! ১২টি বিজ্ঞাপন সফলভাবে দেখে লেভেল #$previousLevel সম্পন্ন করেছেন। +$totalCoinsEarned রিওয়ার্ড পয়েন্ট ($totalCoinsEarned কয়েন) একাউন্টে যোগ হয়েছে।"
+                        _quizFlowState.value = QuizFlowState.Completed(resultMsg)
+                        _adStatusMessage.value = resultMsg
+                        _isFlowBusy.value = false
 
-                            val totalTakaEarned = 0.06 + pendingSpinBonusTaka
-                            val bonusCoins = (pendingSpinBonusTaka * 100).toLong()
-                            val totalCoinsEarned = 6L + bonusCoins
-                            val previousLevel = _currentUser.value?.currentLevel ?: 1
-
-                            completeCurrentLevel(
-                                activity.applicationContext,
-                                takaEarned = totalTakaEarned,
-                                coinsEarned = totalCoinsEarned
-                            ) { updatedUser ->
-                                val resultMsg = "🎉 অভিনন্দন! ১২টি বিজ্ঞাপন সফলভাবে দেখে লেভেল #$previousLevel সম্পন্ন করেছেন। +$totalCoinsEarned রিওয়ার্ড পয়েন্ট ($totalCoinsEarned কয়েন) একাউন্টে যোগ হয়েছে।"
-                                _quizFlowState.value = QuizFlowState.Completed(resultMsg)
-                                _adStatusMessage.value = resultMsg
-                                _isFlowBusy.value = false
-
-                                // Show Next Level prompt for continuous targeted earning flow
-                                _levelCompletionData.value = LevelCompletionData(
-                                    completedLevel = previousLevel,
-                                    nextLevel = updatedUser.currentLevel,
-                                    coinsEarned = totalCoinsEarned,
-                                    totalCoins = updatedUser.rewardCoins,
-                                    bonusCoins = bonusCoins,
-                                    takaEarned = totalTakaEarned,
-                                    totalBalance = updatedUser.earningsTaka,
-                                    bonusTaka = pendingSpinBonusTaka
-                                )
-                            }
-                        } else {
-                            _isFlowBusy.value = false
-                            _quizFlowState.value = QuizFlowState.Idle
-                            _adStatusMessage.value = "বিজ্ঞাপন সম্পূর্ণ দেখা হয়নি ($verifiedAdsCountInCurrentLevel/১২)। লেভেল পয়েন্ট পাওয়ার জন্য সবকটি বিজ্ঞাপন দেখতে হবে।"
-                        }
+                        // Show Next Level prompt for continuous targeted earning flow
+                        _levelCompletionData.value = LevelCompletionData(
+                            completedLevel = previousLevel,
+                            nextLevel = updatedUser.currentLevel,
+                            coinsEarned = totalCoinsEarned,
+                            totalCoins = updatedUser.rewardCoins,
+                            bonusCoins = bonusCoins,
+                            takaEarned = totalTakaEarned,
+                            totalBalance = updatedUser.earningsTaka,
+                            bonusTaka = pendingSpinBonusTaka
+                        )
                     }
+                } else {
+                    _isFlowBusy.value = false
+                    _quizFlowState.value = QuizFlowState.Idle
+                    _adStatusMessage.value = "বিজ্ঞাপন সম্পূর্ণ দেখা হয়নি ($verifiedAdsCountInCurrentLevel/১২)। লেভেল পয়েন্ট পাওয়ার জন্য সবকটি বিজ্ঞাপন দেখতে হবে।"
                 }
             }
         }
