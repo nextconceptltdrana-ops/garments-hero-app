@@ -2,9 +2,18 @@ package com.example
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+
+enum class OtpFlowType {
+    LOGIN,
+    REGISTRATION
+}
 
 class AuthViewModel : ViewModel() {
 
@@ -166,6 +175,12 @@ class AuthViewModel : ViewModel() {
 
     private val _showWelcomeMotivation = MutableStateFlow(false)
     val showWelcomeMotivation: StateFlow<Boolean> = _showWelcomeMotivation.asStateFlow()
+
+    private val _registerPin = MutableStateFlow("")
+    val registerPin: StateFlow<String> = _registerPin.asStateFlow()
+
+    private val _loginPin = MutableStateFlow("")
+    val loginPin: StateFlow<String> = _loginPin.asStateFlow()
 
     private var headerClickCount = 0
     private var hasPlayedSessionAd = false
@@ -395,7 +410,7 @@ class AuthViewModel : ViewModel() {
         FirebaseUserManager.syncPendingProgressToFirestore(context) {
             // Sync fresh level & user details directly from Firestore
             if (saved != null && saved.mobile.isNotEmpty()) {
-                FirebaseUserManager.loginUser(context, saved.mobile) { success, _, updatedUser ->
+                FirebaseUserManager.loginUser(context, saved.mobile, saved.pin) { success, _, updatedUser ->
                     if (success && updatedUser != null) {
                         _currentUser.value = updatedUser
                         refreshReferralData(context)
@@ -459,14 +474,46 @@ class AuthViewModel : ViewModel() {
         _loginMobile.value = value
     }
 
+    fun onRegisterPinChange(value: String) {
+        _registerPin.value = value
+    }
+
+    fun onLoginPinChange(value: String) {
+        _loginPin.value = value
+    }
+
     fun register(context: Context) {
+        val rawName = _registerName.value.trim()
+        val rawMobile = _registerMobile.value.trim()
+        val rawPin = _registerPin.value.trim()
+        val cleanMobile = FirebaseUserManager.normalizeMobile(rawMobile)
+
+        if (rawName.isEmpty()) {
+            _userMessage.value = "অনুগ্রহ করে আপনার নাম লিখুন।"
+            _isSuccessMsg.value = false
+            return
+        }
+
+        if (!FirebaseUserManager.isValidMobile(cleanMobile)) {
+            _userMessage.value = "একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।"
+            _isSuccessMsg.value = false
+            return
+        }
+        
+        if (rawPin.length < 4) {
+            _userMessage.value = "অন্তত ৪ ডিজিটের গোপন পিন দিন।"
+            _isSuccessMsg.value = false
+            return
+        }
+
         _isLoading.value = true
         _userMessage.value = null
 
         FirebaseUserManager.registerUser(
             context = context,
-            name = _registerName.value,
-            mobile = _registerMobile.value,
+            name = rawName,
+            mobile = cleanMobile,
+            pin = rawPin,
             referralInput = _registerReferral.value
         ) { success, msg, user ->
             _isLoading.value = false
@@ -487,12 +534,29 @@ class AuthViewModel : ViewModel() {
     }
 
     fun login(context: Context) {
+        val rawMobile = _loginMobile.value
+        val rawPin = _loginPin.value.trim()
+        val cleanMobile = FirebaseUserManager.normalizeMobile(rawMobile)
+        
+        if (!FirebaseUserManager.isValidMobile(cleanMobile)) {
+            _userMessage.value = "একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।"
+            _isSuccessMsg.value = false
+            return
+        }
+        
+        if (rawPin.length < 4) {
+            _userMessage.value = "অনুগ্রহ করে আপনার গোপন পিন দিন।"
+            _isSuccessMsg.value = false
+            return
+        }
+
         _isLoading.value = true
         _userMessage.value = null
 
         FirebaseUserManager.loginUser(
             context = context,
-            mobile = _loginMobile.value
+            mobile = cleanMobile,
+            pin = rawPin
         ) { success, msg, user ->
             _isLoading.value = false
             _isSuccessMsg.value = success
@@ -763,9 +827,17 @@ class AuthViewModel : ViewModel() {
         context: Context,
         paymentMethod: String,
         paymentNumber: String,
-        amountTaka: Double
+        amountTaka: Double,
+        pin: String
     ) {
         val user = _currentUser.value ?: return
+        
+        if (pin.trim() != user.pin) {
+            _isWithdrawSuccess.value = false
+            _withdrawStatusMessage.value = "ভুল পিন! অনুগ্রহ করে সঠিক পিন দিন।"
+            return
+        }
+        
         _isWithdrawLoading.value = true
         _withdrawStatusMessage.value = null
 

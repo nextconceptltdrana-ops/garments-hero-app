@@ -85,11 +85,13 @@ object FirebaseUserManager {
         context: Context,
         name: String,
         mobile: String,
+        pin: String,
         referralInput: String,
         onResult: (success: Boolean, message: String, user: User?) -> Unit
     ) {
         val cleanName = name.trim()
         val cleanMobile = normalizeMobile(mobile)
+        val cleanPin = pin.trim()
         val cleanReferral = referralInput.trim().uppercase()
 
         if (cleanName.isEmpty()) {
@@ -99,6 +101,11 @@ object FirebaseUserManager {
 
         if (!isValidMobile(cleanMobile)) {
             onResult(false, "একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।", null)
+            return
+        }
+        
+        if (cleanPin.length < 4) {
+            onResult(false, "অন্তত ৪ ডিজিটের গোপন পিন দিন।", null)
             return
         }
 
@@ -114,6 +121,7 @@ object FirebaseUserManager {
                 val newUser = User(
                     name = cleanName,
                     mobile = cleanMobile,
+                    pin = cleanPin,
                     referralCode = myReferralCode,
                     referredBy = cleanReferral,
                     createdAt = System.currentTimeMillis(),
@@ -208,6 +216,7 @@ object FirebaseUserManager {
         return User(
             name = snapshot.getString("name") ?: "ব্যবহারকারী",
             mobile = mobile,
+            pin = snapshot.getString("pin") ?: "",
             referralCode = snapshot.getString("referralCode") ?: generateReferralCode(mobile),
             referredBy = snapshot.getString("referredBy") ?: "",
             createdAt = snapshot.getLong("createdAt") ?: System.currentTimeMillis(),
@@ -303,15 +312,89 @@ object FirebaseUserManager {
             }
     }
 
-    fun loginUser(
+    fun checkNewRegistrationAvailableForOtp(
+        name: String,
+        mobile: String,
+        onResult: (available: Boolean, message: String) -> Unit
+    ) {
+        val cleanName = name.trim()
+        val cleanMobile = normalizeMobile(mobile)
+
+        if (cleanName.isEmpty()) {
+            onResult(false, "অনুগ্রহ করে আপনার নাম লিখুন।")
+            return
+        }
+
+        if (!isValidMobile(cleanMobile)) {
+            onResult(false, "একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।")
+            return
+        }
+
+        val userDocRef = firestore.collection("users").document(cleanMobile)
+        userDocRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                onResult(false, "এই মোবাইল নম্বরটি ইতোমধ্যে নিবন্ধিত! অনুগ্রহ করে 'লগ ইন' করুন।")
+            } else {
+                onResult(true, "ওটিপি সফলভাবে পাঠানো হয়েছে।")
+            }
+        }.addOnFailureListener { e ->
+            Log.w(TAG, "Registration OTP check fallback: ${e.message}")
+            onResult(true, "ওটিপি সফলভাবে পাঠানো হয়েছে।")
+        }
+    }
+
+    fun checkUserExistsForOtp(
         context: Context,
         mobile: String,
-        onResult: (success: Boolean, message: String, user: User?) -> Unit
+        onResult: (exists: Boolean, message: String) -> Unit
     ) {
         val cleanMobile = normalizeMobile(mobile)
 
         if (!isValidMobile(cleanMobile)) {
+            onResult(false, "একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।")
+            return
+        }
+
+        val userDocRef = firestore.collection("users").document(cleanMobile)
+        userDocRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                onResult(true, "ওটিপি সফলভাবে পাঠানো হয়েছে।")
+            } else {
+                val saved = getSavedSession(context)
+                if (saved != null && saved.mobile == cleanMobile) {
+                    onResult(true, "ওটিপি সফলভাবে পাঠানো হয়েছে।")
+                } else {
+                    onResult(false, "এই মোবাইল নম্বরটি নিবন্ধিত নয়! অনুগ্রহ করে আগে 'নিবন্ধন' করুন।")
+                }
+            }
+        }.addOnFailureListener { e ->
+            Log.w(TAG, "User check for OTP fallback: ${e.message}")
+            val saved = getSavedSession(context)
+            if (saved != null && saved.mobile == cleanMobile) {
+                onResult(true, "ওটিপি সফলভাবে পাঠানো হয়েছে।")
+            } else {
+                // If offline or network error, let the user proceed with OTP
+                onResult(true, "ওটিপি সফলভাবে পাঠানো হয়েছে।")
+            }
+        }
+    }
+
+    fun loginUser(
+        context: Context,
+        mobile: String,
+        pin: String,
+        onResult: (success: Boolean, message: String, user: User?) -> Unit
+    ) {
+        val cleanMobile = normalizeMobile(mobile)
+        val cleanPin = pin.trim()
+
+        if (!isValidMobile(cleanMobile)) {
             onResult(false, "একটি সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।", null)
+            return
+        }
+        
+        if (cleanPin.length < 4) {
+            onResult(false, "অনুগ্রহ করে আপনার গোপন পিন দিন।", null)
             return
         }
 
@@ -320,13 +403,21 @@ object FirebaseUserManager {
         userDocRef.get().addOnSuccessListener { snapshot ->
             if (snapshot.exists()) {
                 val user = parseUserFromSnapshot(snapshot, cleanMobile)
-                saveSession(context, user)
-                Log.d(TAG, "User logged in successfully from Firestore: $cleanMobile (referrals: ${user.referralsCount})")
-                onResult(true, "স্বাগতম! লগইন সম্পন্ন হয়েছে।", user)
+                if (user.pin.isNotEmpty() && user.pin != cleanPin) {
+                    onResult(false, "ভুল পিন! অনুগ্রহ করে সঠিক গোপন পিন দিন।", null)
+                } else {
+                    saveSession(context, user)
+                    Log.d(TAG, "User logged in successfully from Firestore: $cleanMobile (referrals: ${user.referralsCount})")
+                    onResult(true, "স্বাগতম! লগইন সম্পন্ন হয়েছে।", user)
+                }
             } else {
                 val saved = getSavedSession(context)
                 if (saved != null && saved.mobile == cleanMobile) {
-                    onResult(true, "স্বাগতম! অফলাইন সেশন থেকে লগইন সম্পন্ন হয়েছে।", saved)
+                    if (saved.pin.isNotEmpty() && saved.pin != cleanPin) {
+                        onResult(false, "ভুল পিন! অনুগ্রহ করে সঠিক গোপন পিন দিন।", null)
+                    } else {
+                        onResult(true, "স্বাগতম! অফলাইন সেশন থেকে লগইন সম্পন্ন হয়েছে।", saved)
+                    }
                 } else {
                     onResult(false, "এই মোবাইল নম্বরটি নিবন্ধিত নয়! অনুগ্রহ করে আগে 'নিবন্ধন' করুন।", null)
                 }
@@ -335,7 +426,11 @@ object FirebaseUserManager {
             Log.w(TAG, "Firestore login check failed (offline mode active): ${e.message}")
             val saved = getSavedSession(context)
             if (saved != null && saved.mobile == cleanMobile) {
-                onResult(true, "স্বাগতম! অফলাইন তথ্য থেকে লগইন সম্পন্ন হয়েছে।", saved)
+                if (saved.pin.isNotEmpty() && saved.pin != cleanPin) {
+                    onResult(false, "ভুল পিন! অনুগ্রহ করে সঠিক গোপন পিন দিন।", null)
+                } else {
+                    onResult(true, "স্বাগতম! অফলাইন তথ্য থেকে লগইন সম্পন্ন হয়েছে।", saved)
+                }
             } else {
                 onResult(false, "ইন্টারনেট সংযোগ পরীক্ষা করুন অথবা নিবন্ধন করুন।", null)
             }

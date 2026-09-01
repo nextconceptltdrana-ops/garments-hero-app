@@ -1,0 +1,346 @@
+3801 0 fun AdminUserItemCard(
+3802 0     user: User,
+3803 0     onSaveEdit: (name: String, level: Int, earningsTaka: Double, rewardCoins: Long, refCode: String, refBy: String) -> Unit,
+3804 0     onToggleBan: (isBanned: Boolean, banReason: String) -> Unit,
+3805 0     onDeleteUser: () -> Unit
+3806 1 ) {
+3807 1     var showEditDialog by remember { mutableStateOf(false) }
+3808 1     var showBanDialog by remember { mutableStateOf(false) }
+3809 1     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+3810 1 
+3811 2     val dateFormatted = try {
+3812 2         val sdf = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.getDefault())
+3813 2         sdf.format(java.util.Date(user.createdAt))
+3814 2     } catch (e: Exception) {
+3815 2         "নতুন জয়েন"
+3816 1     }
+3817 1 
+3818 1     Card(
+3819 1         modifier = Modifier.fillMaxWidth(),
+3820 1         shape = RoundedCornerShape(14.dp),
+3821 1         colors = CardDefaults.cardColors(
+3822 1             containerColor = if (user.isBanned) Color(0xFFFFEBEE) else MaterialTheme.colorScheme.surface
+3823 1         ),
+3824 1         border = if (user.isBanned) BorderStroke(1.5.dp, Color(0xFFD32F2F)) else null,
+3825 1         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+3826 2     ) {
+3827 2         Column(
+3828 2             modifier = Modifier
+3829 2                 .fillMaxWidth()
+3830 2                 .padding(14.dp)
+3831 3         ) {
+3832 3             Row(
+3833 3                 modifier = Modifier.fillMaxWidth(),
+3834 3                 verticalAlignment = Alignment.Top
+3835 4             ) {
+3836 4                 Box(
+3837 4                     modifier = Modifier
+3838 4                         .size(46.dp)
+3839 4                         .clip(CircleShape)
+3840 4                         .background(if (user.isBanned) Color(0xFFD32F2F) else Color(0xFF311B92)),
+3841 4                     contentAlignment = Alignment.Center
+3842 5                 ) {
+3843 5                     Text(
+3844 5                         text = user.name.take(1).uppercase().ifEmpty { "U" },
+3845 5                         color = Color.White,
+3846 5                         fontWeight = FontWeight.Bold,
+3847 5                         fontSize = 20.sp
+3848 5                     )
+3849 4                 }
+3850 4 
+3851 4                 Spacer(modifier = Modifier.width(12.dp))
+3852 4 
+3853 5                 Column(modifier = Modifier.weight(1f)) {
+3854 5                     Row(
+3855 5                         modifier = Modifier.fillMaxWidth(),
+3856 5                         horizontalArrangement = Arrangement.SpaceBetween,
+3857 5                         verticalAlignment = Alignment.CenterVertically
+3858 6                     ) {
+3859 6                         Text(
+3860 6                             text = user.name.ifEmpty { "ইউজার (${user.mobile})" },
+3861 6                             fontWeight = FontWeight.Bold,
+3862 6                             fontSize = 16.sp,
+3863 6                             color = MaterialTheme.colorScheme.onSurface,
+3864 6                             modifier = Modifier.weight(1f, fill = false)
+3865 6                         )
+3866 6 
+3867 7                         if (user.isBanned) {
+3868 7                             Surface(
+3869 7                                 color = Color(0xFFD32F2F),
+3870 7                                 shape = RoundedCornerShape(6.dp)
+3871 8                             ) {
+3872 8                                 Text(
+3873 8                                     text = "🚫 BANNED",
+3874 8                                     color = Color.White,
+3875 8                                     fontSize = 11.sp,
+3876 8                                     fontWeight = FontWeight.Bold,
+3877 8                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+3878 8                                 )
+3879 7                             }
+3880 6                         }
+3881 5                     }
+3882 5 
+3883 5                     Text(
+3884 5                         text = "📱 মোবাইল: ${user.mobile}",
+3885 5                         fontSize = 13.5.sp,
+3886 5                         fontWeight = FontWeight.SemiBold,
+3887 5                         color = MaterialTheme.colorScheme.primary
+3888 5                     )
+3889 5                     Text(
+3890 5                         text = "📅 যোগদানের সময়: $dateFormatted",
+3891 5                         fontSize = 12.sp,
+3892 5                         fontWeight = FontWeight.Medium,
+3893 5                         color = Color(0xFF475569)
+3894 5                     )
+3895 5                     Text(
+3896 5                         text = "🎁 নিজের কোড: ${user.referralCode} | 🤝 যার রেফারে: ${if (user.referredBy.isNotBlank()) user.referredBy else "সরাসরি"}",
+3897 5                         fontSize = 12.5.sp,
+3898 5                         fontWeight = FontWeight.Bold,
+3899 5                         color = Color(0xFFD97706)
+3900 5                     )
+3901 5 
+3902 6                     if (user.isBanned && user.banReason.isNotBlank()) {
+3903 6                         Text(
+3904 6                             text = "⚠️ ব্যান কারণ: ${user.banReason}",
+3905 6                             fontSize = 12.sp,
+3906 6                             fontWeight = FontWeight.SemiBold,
+3907 6                             color = Color(0xFFC62828)
+3908 6                         )
+3909 5                     }
+3910 5 
+3911 5                     Spacer(modifier = Modifier.height(6.dp))
+3912 5 
+3913 5                     Row(
+3914 5                         modifier = Modifier.fillMaxWidth(),
+3915 5                         verticalAlignment = Alignment.CenterVertically,
+3916 5                         horizontalArrangement = Arrangement.spacedBy(6.dp)
+3917 6                     ) {
+3918 6                         Surface(
+3919 6                             color = Color(0xFF311B92).copy(alpha = 0.1f),
+3920 6                             shape = RoundedCornerShape(6.dp)
+3921 7                         ) {
+3922 7                             Text(
+3923 7                                 text = "⭐ লেভেল #${user.currentLevel}",
+3924 7                                 fontSize = 12.sp,
+3925 7                                 fontWeight = FontWeight.Bold,
+3926 7                                 color = Color(0xFF311B92),
+3927 7                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+3928 7                             )
+3929 6                         }
+3930 6 
+3931 6                         Surface(
+3932 6                             color = Color(0xFF2E7D32).copy(alpha = 0.1f),
+3933 6                             shape = RoundedCornerShape(6.dp)
+3934 7                         ) {
+3935 7                             Text(
+3936 7                                 text = "💰 ৳${String.format(Locale.US, "%.2f", user.earningsTaka)}",
+3937 7                                 fontSize = 12.sp,
+3938 7                                 fontWeight = FontWeight.Bold,
+3939 7                                 color = Color(0xFF15803D),
+3940 7                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+3941 7                             )
+3942 6                         }
+3943 6 
+3944 6                         Surface(
+3945 6                             color = Color(0xFFE65100).copy(alpha = 0.1f),
+3946 6                             shape = RoundedCornerShape(6.dp)
+3947 7                         ) {
+3948 7                             Text(
+3949 7                                 text = "🪙 ${user.rewardCoins} কয়েন",
+3950 7                                 fontSize = 12.sp,
+3951 7                                 fontWeight = FontWeight.Bold,
+3952 7                                 color = Color(0xFFE65100),
+3953 7                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+3954 7                             )
+3955 6                         }
+3956 5                     }
+3957 4                 }
+3958 3             }
+3959 3 
+3960 3             Spacer(modifier = Modifier.height(10.dp))
+3961 3             HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+3962 3             Spacer(modifier = Modifier.height(8.dp))
+3963 3 
+3964 3             // Action Buttons Row: Edit (লেভেল/টাকা/নাম), Ban/Unban, Delete
+3965 3             Row(
+3966 3                 modifier = Modifier.fillMaxWidth(),
+3967 3                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+3968 3                 verticalAlignment = Alignment.CenterVertically
+3969 4             ) {
+3970 4                 // Edit Button
+3971 4                 OutlinedButton(
+3972 4                     onClick = { showEditDialog = true },
+3973 4                     modifier = Modifier.weight(1f),
+3974 4                     shape = RoundedCornerShape(8.dp),
+3975 4                     colors = ButtonDefaults.outlinedButtonColors(
+3976 4                         contentColor = Color(0xFF311B92)
+3977 4                     ),
+3978 4                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+3979 5                 ) {
+3980 5                     Icon(
+3981 5                         imageVector = Icons.Default.Edit,
+3982 5                         contentDescription = "Edit",
+3983 5                         modifier = Modifier.size(16.dp)
+3984 5                     )
+3985 5                     Spacer(modifier = Modifier.width(4.dp))
+3986 5                     Text("এডিট / পরিবর্তন", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+3987 4                 }
+3988 4 
+3989 4                 // Ban / Unban Button
+3990 4                 Button(
+3991 5                     onClick = {
+3992 6                         if (user.isBanned) {
+3993 6                             onToggleBan(false, "")
+3994 6                         } else {
+3995 6                             showBanDialog = true
+3996 5                         }
+3997 4                     },
+3998 4                     modifier = Modifier.weight(1f),
+3999 4                     shape = RoundedCornerShape(8.dp),
+4000 4                     colors = ButtonDefaults.buttonColors(
+4001 4                         containerColor = if (user.isBanned) Color(0xFF2E7D32) else Color(0xFFD97706)
+4002 4                     ),
+4003 4                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+4004 5                 ) {
+4005 5                     Icon(
+4006 5                         imageVector = if (user.isBanned) Icons.Default.CheckCircle else Icons.Default.Block,
+4007 5                         contentDescription = "Ban Status",
+4008 5                         tint = Color.White,
+4009 5                         modifier = Modifier.size(16.dp)
+4010 5                     )
+4011 5                     Spacer(modifier = Modifier.width(4.dp))
+4012 5                     Text(
+4013 5                         text = if (user.isBanned) "আনব্যান করুন" else "ব্যান করুন",
+4014 5                         fontSize = 12.sp,
+4015 5                         fontWeight = FontWeight.Bold,
+4016 5                         color = Color.White
+4017 5                     )
+4018 4                 }
+4019 4 
+4020 4                 // Delete Button
+4021 4                 IconButton(
+4022 4                     onClick = { showDeleteConfirmDialog = true },
+4023 4                     modifier = Modifier
+4024 4                         .size(36.dp)
+4025 4                         .background(Color(0xFFFFEBEE), RoundedCornerShape(8.dp))
+4026 5                 ) {
+4027 5                     Icon(
+4028 5                         imageVector = Icons.Default.DeleteForever,
+4029 5                         contentDescription = "Delete User",
+4030 5                         tint = Color(0xFFD32F2F),
+4031 5                         modifier = Modifier.size(20.dp)
+4032 5                     )
+4033 4                 }
+4034 3             }
+4035 2         }
+4036 1     }
+4037 1 
+4038 1     // 1. Edit User Details Dialog (Change Level, Money, Coins, Name, Referrer)
+4039 2     if (showEditDialog) {
+4040 2         var editName by remember { mutableStateOf(user.name) }
+4041 2         var editLevel by remember { mutableStateOf(user.currentLevel.toString()) }
+4042 2         var editTaka by remember { mutableStateOf(String.format(Locale.US, "%.2f", user.earningsTaka)) }
+4043 2         var editCoins by remember { mutableStateOf(user.rewardCoins.toString()) }
+4044 2         var editReferralCode by remember { mutableStateOf(user.referralCode) }
+4045 2         var editReferredBy by remember { mutableStateOf(user.referredBy) }
+4046 2 
+4047 2         AlertDialog(
+4048 2             onDismissRequest = { showEditDialog = false },
+4049 3             title = {
+4050 3                 Text("🛠️ ইউজার তথ্য পরিবর্তন (এডমিন)", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+4051 2             },
+4052 3             text = {
+4053 3                 Column(
+4054 3                     modifier = Modifier
+4055 3                         .fillMaxWidth()
+4056 3                         .verticalScroll(rememberScrollState()),
+4057 3                     verticalArrangement = Arrangement.spacedBy(8.dp)
+4058 4                 ) {
+4059 4                     Text(
+4060 4                         text = "মোবাইল: ${user.mobile}",
+4061 4                         fontSize = 13.sp,
+4062 4                         fontWeight = FontWeight.Bold,
+4063 4                         color = Color(0xFF311B92)
+4064 4                     )
+4065 4 
+4066 4                     OutlinedTextField(
+4067 4                         value = editName,
+4068 4                         onValueChange = { editName = it },
+4069 4                         label = { Text("ইউজারের নাম") },
+4070 4                         singleLine = true,
+4071 4                         modifier = Modifier.fillMaxWidth()
+4072 4                     )
+4073 4 
+4074 4                     OutlinedTextField(
+4075 4                         value = editLevel,
+4076 4                         onValueChange = { editLevel = it.filter { char -> char.isDigit() } },
+4077 4                         label = { Text("⭐ বর্তমান লেভেল (Level)") },
+4078 4                         supportingText = { Text("লেভেল রিসেট বা যেকোনো লেভেলে সেট করতে পারবেন") },
+4079 4                         keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+4080 4                         singleLine = true,
+4081 4                         modifier = Modifier.fillMaxWidth()
+4082 4                     )
+4083 4 
+4084 4                     OutlinedTextField(
+4085 4                         value = editTaka,
+4086 4                         onValueChange = { editTaka = it },
+4087 4                         label = { Text("💰 ব্যালেন্স টাকা (৳)") },
+4088 4                         keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+4089 4                         singleLine = true,
+4090 4                         modifier = Modifier.fillMaxWidth()
+4091 4                     )
+4092 4 
+4093 4                     OutlinedTextField(
+4094 4                         value = editCoins,
+4095 4                         onValueChange = { editCoins = it.filter { char -> char.isDigit() } },
+4096 4                         label = { Text("🪙 রিওয়ার্ড কয়েন (Coins)") },
+4097 4                         keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+4098 4                         singleLine = true,
+4099 4                         modifier = Modifier.fillMaxWidth()
+4100 4                     )
+4101 4 
+4102 4                     OutlinedTextField(
+4103 4                         value = editReferralCode,
+4104 4                         onValueChange = { editReferralCode = it.uppercase() },
+4105 4                         label = { Text("ইউজারের রেফারেল কোড") },
+4106 4                         singleLine = true,
+4107 4                         modifier = Modifier.fillMaxWidth()
+4108 4                     )
+4109 4 
+4110 4                     OutlinedTextField(
+4111 4                         value = editReferredBy,
+4112 4                         onValueChange = { editReferredBy = it.uppercase() },
+4113 4                         label = { Text("যার রেফার কোডে যুক্ত হয়েছে") },
+4114 4                         singleLine = true,
+4115 4                         modifier = Modifier.fillMaxWidth()
+4116 4                     )
+4117 3                 }
+4118 2             },
+4119 3             confirmButton = {
+4120 3                 Button(
+4121 4                     onClick = {
+4122 4                         val levelInt = editLevel.toIntOrNull() ?: user.currentLevel
+4123 4                         val takaDouble = editTaka.toDoubleOrNull() ?: user.earningsTaka
+4124 4                         val coinsLong = editCoins.toLongOrNull() ?: user.rewardCoins
+4125 4                         onSaveEdit(
+4126 4                             editName.trim(),
+4127 4                             levelInt,
+4128 4                             takaDouble,
+4129 4                             coinsLong,
+4130 4                             editReferralCode.trim(),
+4131 4                             editReferredBy.trim()
+4132 4                         )
+4133 4                         showEditDialog = false
+4134 3                     },
+4135 3                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF311B92))
+4136 4                 ) {
+4137 4                     Text("সংরক্ষণ করুন")
+4138 3                 }
+4139 2             },
+4140 3             dismissButton = {
+4141 3                 TextButton(onClick = { showEditDialog = false }) {
+4142 3                     Text("বাতিল")
+4143 2                 }
+4144 1             }
+4145 1         )
+4146 0     }

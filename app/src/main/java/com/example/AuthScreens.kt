@@ -166,6 +166,7 @@ fun launchWhatsAppHelpline(context: Context, whatsappNumber: String, userMobile:
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+
 @Composable
 fun MainAuthApp(viewModel: AuthViewModel) {
     val context = LocalContext.current
@@ -185,6 +186,7 @@ fun MainAuthApp(viewModel: AuthViewModel) {
     val showDeleteAccountDialog by viewModel.showDeleteAccountDialog.collectAsState()
     val showFairPlayDialog by viewModel.showFairPlayDialog.collectAsState()
     val showWelcomeMotivation by viewModel.showWelcomeMotivation.collectAsState()
+    // val showOtpDialog by viewModel.showOtpDialog.collectAsState()
     val isDeletingAccount by viewModel.isDeletingAccount.collectAsState()
     val whatsappNumber by viewModel.whatsappNumber.collectAsState()
 
@@ -595,6 +597,7 @@ fun MainAuthApp(viewModel: AuthViewModel) {
             }
         }
     }
+
 }
 
 @Composable
@@ -681,6 +684,8 @@ fun RegistrationCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            val registerPin by viewModel.registerPin.collectAsState()
+            
             OutlinedTextField(
                 value = mobile,
                 onValueChange = { viewModel.onRegisterMobileChange(it) },
@@ -688,6 +693,21 @@ fun RegistrationCard(
                 placeholder = { Text("017XXXXXXXX", color = Color(0xFF64748B)) },
                 leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                colors = fieldColors,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = registerPin,
+                onValueChange = { viewModel.onRegisterPinChange(it) },
+                label = { Text("গোপন পিন *") },
+                placeholder = { Text("অন্তত ৪ ডিজিটের পিন", color = Color(0xFF64748B)) },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -767,6 +787,7 @@ fun RegistrationCard(
     }
 }
 
+
 @Composable
 fun LoginCard(
     viewModel: AuthViewModel,
@@ -774,6 +795,7 @@ fun LoginCard(
     isLoading: Boolean
 ) {
     val mobile by viewModel.loginMobile.collectAsState()
+    val loginPin by viewModel.loginPin.collectAsState()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -848,6 +870,21 @@ fun LoginCard(
                 singleLine = true
             )
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = loginPin,
+                onValueChange = { viewModel.onLoginPinChange(it) },
+                label = { Text("গোপন পিন *") },
+                placeholder = { Text("আপনার পিন দিন", color = Color(0xFF64748B)) },
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = fieldColors,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true
+            )
+
             Spacer(modifier = Modifier.height(22.dp))
 
             Surface(
@@ -906,6 +943,7 @@ fun LoginCard(
         }
     }
 }
+
 
 @Composable
 fun UserIncomeDashboard(
@@ -1393,6 +1431,7 @@ fun UserIncomeDashboard(
     }
 }
 
+
 @Composable
 fun FullScreenInteractiveAdDialog(
     adTitle: String,
@@ -1770,6 +1809,7 @@ fun FullScreenInteractiveAdDialog(
     }
 }
 
+
 @Composable
 fun LevelCompletionNextDialog(
     data: AuthViewModel.LevelCompletionData,
@@ -1966,6 +2006,7 @@ fun LevelCompletionNextDialog(
         }
     )
 }
+
 
 @Composable
 fun GoldenHeaderFrame(
@@ -2248,6 +2289,7 @@ fun GoldenHeaderFrame(
     }
 }
 
+
 @Composable
 fun LevelPlayCard(
     user: User,
@@ -2347,6 +2389,7 @@ fun LevelPlayCard(
         }
     }
 }
+
 
 @Composable
 fun UserAccountDetailsCard(
@@ -2679,6 +2722,7 @@ fun UserAccountDetailsCard(
     }
 }
 
+
 @Composable
 fun WithdrawDialog(
     user: User,
@@ -2689,6 +2733,7 @@ fun WithdrawDialog(
     var selectedMethod by remember { mutableStateOf("bKash") }
     var accountNo by remember { mutableStateOf(user.mobile) }
     var amountText by remember { mutableStateOf("500") }
+    var pinText by remember { mutableStateOf("") }
 
     val withdrawStatus by viewModel.withdrawStatusMessage.collectAsState()
     val isWithdrawSuccess by viewModel.isWithdrawSuccess.collectAsState()
@@ -3004,6 +3049,19 @@ fun WithdrawDialog(
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true
                 )
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                OutlinedTextField(
+                    value = pinText,
+                    onValueChange = { pinText = it },
+                    label = { Text("আপনার গোপন পিন দিন", fontWeight = FontWeight.SemiBold) },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    singleLine = true
+                )
             }
         },
         confirmButton = {
@@ -3014,7 +3072,8 @@ fun WithdrawDialog(
                         context = context,
                         paymentMethod = selectedMethod,
                         paymentNumber = accountNo,
-                        amountTaka = amt
+                        amountTaka = amt,
+                        pin = pinText
                     )
                 },
                 enabled = !isWithdrawLoading,
@@ -3040,6 +3099,7 @@ fun WithdrawDialog(
         }
     )
 }
+
 
 @Composable
 fun ProfileItemRow(
@@ -3071,6 +3131,7 @@ fun ProfileItemRow(
         }
     }
 }
+
 
 @Composable
 fun AdminPasswordDialog(
@@ -3145,6 +3206,7 @@ fun AdminPasswordDialog(
         }
     )
 }
+
 
 @Composable
 fun AdminDashboardScreen(viewModel: AuthViewModel) {
@@ -3569,6 +3631,7 @@ fun AdminDashboardScreen(viewModel: AuthViewModel) {
     }
 }
 
+
 @Composable
 fun AdminWithdrawalItemCard(
     item: WithdrawalRequest,
@@ -3734,6 +3797,7 @@ fun AdminWithdrawalItemCard(
         }
     }
 }
+
 
 @Composable
 fun AdminUserItemCard(
@@ -4152,6 +4216,7 @@ fun AdminUserItemCard(
     }
 }
 
+
 @Composable
 fun AppBlockedScreen(
     message: String?,
@@ -4248,6 +4313,7 @@ fun AppBlockedScreen(
 /**
  * Google Play Store Compliant Privacy Policy Dialog
  */
+
 @Composable
 fun PrivacyPolicyDialog(
     onDismiss: () -> Unit
@@ -4406,6 +4472,7 @@ fun PrivacyPolicyDialog(
 /**
  * Fair Play & Anti-Fraud / AdMob Traffic Protection Dialog
  */
+
 @Composable
 fun FairPlayDialog(
     onDismiss: () -> Unit
@@ -4501,6 +4568,7 @@ fun FairPlayDialog(
 /**
  * Google Play 2024+ Mandatory: Account & Data Deletion Confirmation Dialog
  */
+
 @Composable
 fun DeleteAccountDialog(
     isDeleting: Boolean,
@@ -4577,6 +4645,7 @@ fun DeleteAccountDialog(
         }
     )
 }
+
 
 @Composable
 fun DailyCheckInCard(
@@ -4878,6 +4947,7 @@ fun DailyCheckInCard(
     }
 }
 
+
 @Composable
 fun DailyCheckInCelebrationDialog(
     data: AuthViewModel.CheckInResultData,
@@ -4996,6 +5066,7 @@ fun DailyCheckInCelebrationDialog(
         }
     )
 }
+
 
 @Composable
 fun UserBannedScreen(
@@ -5133,6 +5204,7 @@ fun UserBannedScreen(
     }
 }
 
+
 @Composable
 fun WelcomeMotivationDialog(
     onDismiss: () -> Unit
@@ -5140,7 +5212,7 @@ fun WelcomeMotivationDialog(
     val steps = listOf(
         MotivationStep(
             stepNumber = 1,
-            badge = "ধাপ ১/৪ • সহজ ইনকাম",
+            badge = "ধাপ ১/৫ • সহজ ইনকাম",
             icon = "📱",
             headline = "স্মার্টফোনে ঘরে বসেই নিশ্চিত ইনকাম!",
             title = "প্রতিটি অ্যাড দেখার বিনিময়ে ১০০% রিয়েল টাকা",
@@ -5150,7 +5222,7 @@ fun WelcomeMotivationDialog(
         ),
         MotivationStep(
             stepNumber = 2,
-            badge = "ধাপ ২/৪ • আজীবন কমিশন",
+            badge = "ধাপ ২/৫ • আজীবন কমিশন",
             icon = "🚀",
             headline = "জীবন বদলে দেওয়ার মতো আজীবন ইনকাম!",
             title = "৫% আজীবন লাইফটাইম রেফারেল কমিশন (প্যাসিভ আয়)",
@@ -5160,7 +5232,7 @@ fun WelcomeMotivationDialog(
         ),
         MotivationStep(
             stepNumber = 3,
-            badge = "ধাপ ৩/৪ • দ্রুত উইথড্রল",
+            badge = "ধাপ ৩/৫ • দ্রুত উইথড্রল",
             icon = "⚡",
             headline = "১০০% বিশ্বস্ত ও দ্রুত পেমেন্ট সুবিধা!",
             title = "বিকাশ, নগদ ও রকেটে সরাসরি ক্যাশআউট",
@@ -5170,7 +5242,17 @@ fun WelcomeMotivationDialog(
         ),
         MotivationStep(
             stepNumber = 4,
-            badge = "ধাপ ৪/৪ • শুরু করুন আজই",
+            badge = "ধাপ ৪/৫ • নিরাপত্তা সতর্কতা",
+            icon = "🔒",
+            headline = "আপনার একাউন্টের নিরাপত্তা আপনার হাতে!",
+            title = "গোপন পিন কোড কাউকে শেয়ার করবেন না",
+            desc = "আপনার লগইন এবং উইথড্র করার গোপন পিন (PIN) সম্পূর্ণ ব্যক্তিগত। এই পিন কোডটি কখনোই অন্য কাউকে শেয়ার করবেন না। অন্য কেউ পিন জেনে গেলে আপনার একাউন্টের টাকা চুরি হয়ে যেতে পারে!",
+            accentColor = Color(0xFFFF5252),
+            bgColor = Color(0xFF3E0000)
+        ),
+        MotivationStep(
+            stepNumber = 5,
+            badge = "ধাপ ৫/৫ • শুরু করুন আজই",
             icon = "🏆",
             headline = "আপনার সাফল্য আপনার নিজের হাতে!",
             title = "টিম গড়ে তুলুন এবং শুরু করুন আসল ইনকাম",
@@ -5406,7 +5488,7 @@ fun WelcomeMotivationDialog(
     }
 }
 
-private data class MotivationStep(
+data class MotivationStep(
     val stepNumber: Int,
     val badge: String,
     val icon: String,

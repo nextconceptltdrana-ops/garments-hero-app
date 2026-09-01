@@ -11,6 +11,7 @@ data class User(
     val mobile: String = "",
     val referralCode: String = "",
     val referredBy: String = "",
+    val pin: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     val currentLevel: Int = 1,
     val completedLevels: Int = 0,
